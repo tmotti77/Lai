@@ -66,6 +66,20 @@ Four formal assessment surfaces live under `/assessment`: RIASEC (30 items), Big
 - **Submit endpoint**: one unified `POST /api/assessment/submit` with a zod `discriminatedUnion("type", [...])`. Per-type completeness pre-check (riasec/big5 must have all expected item ids) runs **before** opening a DB connection — bad client requests fail-fast with 400.
 - **Items v1 quality flag**: the Hebrew items in `lib/assessment/<type>/items.ts` are best-effort and need a Hebrew-speaking psychologist's review before public launch. Tracked as a Phase 7 launch-checklist item, not a blocker for Phase 4 matching engine work.
 
+## Phase 4 architecture (occupations DB + matching engine)
+
+The matching engine is the IP. It takes a user's profile (chat-extracted from Phase 2 + formal assessments from Phase 3a) and produces a deterministic ranked list of occupations + a 3-paths recommendation (safe / growth / wildcard) + Hebrew prose explanations. Surface: `/recommendations` page; engine: `lib/matching/engine.ts`.
+
+- **Two-layer architecture, never blurred**: scoring layer is pure TypeScript (`lib/matching/score/{interests,skills,values,big5,constraints,market}.ts`); prose layer is a single LLM call (`lib/ai/prompts/explanations.ts`) that reads scores and writes Hebrew. **The LLM never produces a number.** Don't merge them.
+- **Weights**: 25/20/15/15/15/10 (interests / skills / values / big5 / constraints / market) — master roadmap §9. Sum = 100.
+- **Re-normalization for missing dimensions**: each dimension scorer returns `null` when the user has no signal for it. The combiner (`lib/matching/engine.ts`) drops null dimensions and re-normalizes the remaining weights so they still sum to 100. **Never default a missing dimension to 50** — that biases every match toward neutral. A chat-only user gets weights re-normalized over 4 dimensions; a fully-assessed user gets all 6.
+- **Catalog**: `content/occupations/*.json` (20 hand-curated v1, schema-validated by `scripts/validate-occupations.ts`) + `content/skills/taxonomy.json` (60 skills). Seeded into DB by `npm run seed:occupations` which also bumps `catalog_version`.
+- **Cache**: `recommendations` table keyed on `profile_hash = sha1({profile, catalogVersion})`. Profile change OR catalog change → new hash → recompute. Same hash + ≤7 days old → reuse, no LLM call.
+- **3-paths heuristic** (`lib/matching/paths.ts`): single-pass evaluation in declaration order (safe → growth → wildcard), no occupation reuses across paths. `safe` requires `constraints≥75 + training≤6mo + high demand`. `growth` requires `interests≥70 + 6-18mo training + medium-high demand`. `wildcard` requires `total_score≥60`. Slots that find no qualifying occupation return `null` and the UI shows "no clear N-path option" rather than forcing a bad fit.
+- **Skill matching is fuzzy**: chat-extracted skills are free-form Hebrew labels, not taxonomy ids. `lib/matching/score/skills.ts` matches via lowercase substring containment. Phase 3b (CV upload) will add LLM-based extraction-to-taxonomy.
+- **Catalog quality flag**: 20 occupations v1 are best-effort (`data_source: "public_knowledge_v1_2026-05"`). Need expert review before public launch — tracked in Phase 7. Phase 4.5 expands the catalog toward the master roadmap's target of 100.
+- **Prompt cache** in `explanations.ts`: uses the explicit `messages` array form with `providerOptions.anthropic.cacheControl` on the `role: "system"` message. **Don't use `system: "..."` shorthand on `generateObject`** — top-level `providerOptions` puts the breakpoint on the user message (which changes every call), making the cache write-only.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.
