@@ -12,7 +12,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:types": "supabase gen types typescript --linked --schema public > lib/db/types.gen.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
