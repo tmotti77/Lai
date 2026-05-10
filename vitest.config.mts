@@ -6,9 +6,13 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+    setupFiles: ["./tests/setup.ts"],
     coverage: { provider: "v8", reporter: ["text", "html"] },
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, ".") },
+    alias: {
+      "@": path.resolve(__dirname, "."),
+      "server-only": path.resolve(__dirname, "./tests/mocks/server-only.ts"),
+    },
   },
 });
