@@ -8,6 +8,6 @@ export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const internalUserId = await getOrCreateAnonymousUserId(user?.id);
-  const status = await getStatus(supabase, internalUserId);
+  const status = await getStatus(internalUserId);
   return Response.json(status);
 }

@@ -53,11 +53,19 @@ export const he = {
         values: "ערכים",
         constraints: "אילוצים",
       },
+      cardBlurbs: {
+        riasec: "30 משפטים על תחומי עניין",
+        big5: "20 משפטים על אופי",
+        values: "מה הכי חשוב לך",
+        constraints: "אילוצים מעשיים",
+      },
       status: {
         notStarted: "טרם התחלת",
         inProgress: "באמצע",
         completed: "הושלם",
       },
+      backToHub: "← חזרה לרשימת השאלונים",
+      valuesPageIntro: "בחר את 5 הערכים שהכי חשובים לך, ואז דרג את 3 העליונים.",
     },
     common: {
       next: "המשך",

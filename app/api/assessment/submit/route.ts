@@ -93,7 +93,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const saved = await saveAssessment(supabase, {
+    const saved = await saveAssessment({
       userId: internalUserId,
       type: submission.type,
       responses: submission.responses,

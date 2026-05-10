@@ -3,14 +3,15 @@ import { he } from "@/lib/i18n/he";
 import type { AssessmentStatusMap } from "@/lib/db/assessments";
 
 const TYPES = [
-  { type: "riasec",      href: "/assessment/riasec",      blurb: "30 משפטים על תחומי עניין" },
-  { type: "big5",        href: "/assessment/big5",        blurb: "20 משפטים על אופי" },
-  { type: "values",      href: "/assessment/values",      blurb: "מה הכי חשוב לך" },
-  { type: "constraints", href: "/assessment/constraints", blurb: "אילוצים מעשיים" },
+  { type: "riasec",      href: "/assessment/riasec" },
+  { type: "big5",        href: "/assessment/big5" },
+  { type: "values",      href: "/assessment/values" },
+  { type: "constraints", href: "/assessment/constraints" },
 ] as const;
 
 export function AssessmentHub({ status }: { status: AssessmentStatusMap }) {
   const labels = he.assessment.hub.cardLabels;
+  const blurbs = he.assessment.hub.cardBlurbs;
   const statusLabels = he.assessment.hub.status;
 
   return (
@@ -20,7 +21,7 @@ export function AssessmentHub({ status }: { status: AssessmentStatusMap }) {
         <p className="text-base text-muted-foreground">{he.assessment.hub.subtitle}</p>
       </header>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {TYPES.map(({ type, href, blurb }) => {
+        {TYPES.map(({ type, href }) => {
           const done = status[type] === "completed";
           return (
             <li key={type}>
@@ -30,7 +31,7 @@ export function AssessmentHub({ status }: { status: AssessmentStatusMap }) {
               >
                 <div>
                   <div className="text-base font-medium">{labels[type]}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{blurb}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{blurbs[type]}</div>
                 </div>
                 <div
                   className={`mt-3 inline-flex w-fit rounded-full px-2 py-0.5 text-xs ${

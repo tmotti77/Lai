@@ -8,7 +8,7 @@ export default function ValuesPage() {
   return (
     <AssessmentLayout
       title={he.assessment.values.title}
-      intro="בחר את 5 הערכים שהכי חשובים לך, ואז דרג את 3 העליונים."
+      intro={he.assessment.hub.valuesPageIntro}
     >
       <ValuesPicker />
     </AssessmentLayout>

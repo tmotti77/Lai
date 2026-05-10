@@ -39,6 +39,6 @@ export async function getProfile(userId: string, conversationId: string) {
     .eq("user_id", userId)
     .eq("conversation_id", conversationId)
     .maybeSingle();
-  const formal = await getLatestByType(svc, userId);
+  const formal = await getLatestByType(userId);
   return data ? { ...data, formal } : { formal };
 }
