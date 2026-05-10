@@ -28,23 +28,37 @@ export function getCachedSystemMessage(stage: Stage): ModelMessage {
 }
 
 /**
- * Anthropic-specific cache token names exposed via providerMetadata.
- * Verified against AI SDK's @ai-sdk/anthropic provider metadata shape:
- *   - cacheCreationInputTokens: tokens written to cache on this call
- *   - cacheReadInputTokens: tokens read from cache (the savings)
+ * Cache token usage from a Claude response.
+ *
+ * In AI SDK v6:
+ * - `cacheCreationInputTokens` lives on Anthropic-specific provider metadata
+ *   (`providerMetadata.anthropic.cacheCreationInputTokens`)
+ * - Cache **reads** were standardized cross-provider into `usage.cachedInputTokens`
+ *   (and the modern path `usage.inputTokenDetails.cacheReadTokens`).
+ *   `providerMetadata.anthropic.cacheReadInputTokens` does NOT exist on the type.
+ *   We read both modern + deprecated to be safe.
  */
 export type AnthropicCacheUsage = {
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
 };
 
+type UsageWithCacheRead = {
+  cachedInputTokens?: number;
+  inputTokenDetails?: { cacheReadTokens?: number };
+};
+
 export function extractAnthropicCacheUsage(
+  usage: UsageWithCacheRead | undefined,
   providerMetadata: Record<string, unknown> | undefined,
 ): AnthropicCacheUsage {
-  const meta = providerMetadata?.anthropic as AnthropicCacheUsage | undefined;
+  const anthropicMeta = providerMetadata?.anthropic as
+    | { cacheCreationInputTokens?: number | null }
+    | undefined;
   return {
-    cacheCreationInputTokens: meta?.cacheCreationInputTokens,
-    cacheReadInputTokens: meta?.cacheReadInputTokens,
+    cacheCreationInputTokens: anthropicMeta?.cacheCreationInputTokens ?? undefined,
+    cacheReadInputTokens:
+      usage?.inputTokenDetails?.cacheReadTokens ?? usage?.cachedInputTokens,
   };
 }
 

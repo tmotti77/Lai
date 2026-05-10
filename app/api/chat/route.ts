@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { streamText, type UIMessage, type ModelMessage } from "ai";
+import { streamText, stepCountIs, type UIMessage, type ModelMessage } from "ai";
 import {
   anthropic,
   MODEL_ID,
@@ -141,12 +141,31 @@ export async function POST(req: Request) {
     model: anthropic(MODEL_ID),
     messages,
     tools: { set_stage: setStageTool },
+    // Allow up to 2 steps so Claude can call set_stage AND optionally add a closing
+    // text after the tool result. Default of 1 step would stop the stream right after
+    // the tool call with no follow-up text.
+    stopWhen: stepCountIs(2),
+    experimental_onToolCallStart: async ({ toolCall }) => {
+      console.log("[chat] tool call start", {
+        conversationId: conversation.id,
+        toolName: toolCall.toolName,
+        stage: currentStage,
+      });
+    },
+    experimental_onToolCallFinish: async ({ toolCall }) => {
+      console.log("[chat] tool call finish", {
+        conversationId: conversation.id,
+        toolName: toolCall.toolName,
+        stage: currentStage,
+      });
+    },
     onFinish: async ({ text, usage, providerMetadata }) => {
-      const cache = extractAnthropicCacheUsage(providerMetadata);
+      const cache = extractAnthropicCacheUsage(usage, providerMetadata);
 
       console.log("[chat] turn finished", {
         conversationId: conversation.id,
         stage: currentStage,
+        advancedTo: advancedToStage ?? "(no advance)",
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         cacheRead: cache.cacheReadInputTokens ?? 0,

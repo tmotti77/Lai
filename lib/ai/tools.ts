@@ -18,7 +18,7 @@ export function makeSetStageTool(args: {
 }) {
   return tool({
     description:
-      "Call this when you judge the current stage of the assessment is complete and the user is ready to move to the next stage. The tool call is invisible to the user — do not also write the stage name in the visible text.",
+      "REQUIRED stage advancement mechanism. You MUST call this tool when the per-stage transition criteria are met (each stage prompt defines its own criteria). Do not rely on the user to ask you to advance — that's your job. The tool call is invisible to the user — do not also write the stage name in the visible text. Failing to call this tool when criteria are met causes the assessment to stall in the current stage indefinitely.",
     inputSchema: z.object({
       next_stage: stageEnum.describe(
         "The next stage to move into. Must be one of the canonical stages.",
