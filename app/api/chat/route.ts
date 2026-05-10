@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { streamText, type UIMessage, type ModelMessage } from "ai";
 import {
   anthropic,
@@ -12,16 +13,30 @@ import { getOrCreateConversation, appendMessage, loadMessages } from "@/lib/db/q
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const ACTIVE_CONVERSATION_COOKIE = "co_conv";
+const ACTIVE_CONVERSATION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+
 export async function POST(req: Request) {
   const body = (await req.json()) as {
     messages: UIMessage[];
     conversationId?: string;
   };
 
+  // Resolve the active conversation. Priority:
+  //   1. Explicit conversationId in body (future "resume specific chat" feature)
+  //   2. co_conv cookie (continues the user's active chat across requests)
+  //   3. Otherwise, getOrCreateConversation creates a fresh one
+  // Without (2), useChat (which doesn't auto-include conversationId in body)
+  // would create a brand-new conversation per turn — Claude would see only the
+  // current user message and respond as if it's the first turn every time.
+  const cookieStore = await cookies();
+  const cookieConversationId = cookieStore.get(ACTIVE_CONVERSATION_COOKIE)?.value;
+  const incomingConversationId = body.conversationId ?? cookieConversationId;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const internalUserId = await getOrCreateAnonymousUserId(user?.id);
-  const conversation = await getOrCreateConversation(internalUserId, body.conversationId);
+  const conversation = await getOrCreateConversation(internalUserId, incomingConversationId);
 
   // Persist the new user message that just arrived from the client.
   const lastUserMessage = body.messages[body.messages.length - 1];
@@ -86,7 +101,17 @@ export async function POST(req: Request) {
     },
   });
 
+  // Set/refresh the cookie so subsequent turns land in the same conversation.
+  // We send it on every response (not just on creation) so the Max-Age slides forward
+  // as long as the user keeps chatting. SameSite=Lax is enough for first-party use.
+  const setCookie = `${ACTIVE_CONVERSATION_COOKIE}=${conversation.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ACTIVE_CONVERSATION_MAX_AGE_SECONDS}${
+    process.env.NODE_ENV === "production" ? "; Secure" : ""
+  }`;
+
   return result.toUIMessageStreamResponse({
-    headers: { "x-conversation-id": conversation.id },
+    headers: {
+      "x-conversation-id": conversation.id,
+      "Set-Cookie": setCookie,
+    },
   });
 }
