@@ -1,5 +1,5 @@
 import "server-only";
-import { generateObject } from "ai";
+import { generateObject, type ModelMessage } from "ai";
 import { z } from "zod";
 import { anthropic, MODEL_ID } from "@/lib/ai/client";
 import type { Ranking, Occupation, MatchingProfile } from "@/lib/matching/types";
@@ -12,6 +12,10 @@ const ProseSchema = z.object({
     }),
   ),
 });
+
+const SYSTEM_PROMPT = `אתה כותב הסברים קצרים בעברית למשתמש שקיבל המלצה על מקצוע. אתה מקבל את הפרופיל שלו (תחומי עניין, כישורים, ערכים, אילוצים) ואת הציונים של מקצוע מסוים, וכותב 3-5 משפטים שמסבירים *למה* המקצוע הזה התאים לו ספציפית. אל תכתוב כללי. אל תחזור על שם המקצוע יותר מפעם. אל תהפוך את הציונים למספרים בטקסט. הסבר את הקשר בין הפרופיל למקצוע — מה במקצוע מתאים למה שהמשתמש סיפר על עצמו, ומה החיסרון/אתגר.
+
+מבנה: משפט פתיחה אישי → 1-2 משפטים על מה מתאים → משפט אחד על אתגר/דבר שצריך לקחת בחשבון → אופציונלי משפט פעולה הבא.`;
 
 export async function generateExplanations(args: {
   profile: MatchingProfile;
@@ -36,18 +40,28 @@ export async function generateExplanations(args: {
   const profileContext = JSON.stringify(args.profile, null, 2);
   const occContextStr = JSON.stringify(occContext, null, 2);
 
+  // Cache the system message specifically. Top-level providerOptions on
+  // generateObject would put the breakpoint on the user message (which changes
+  // every call) — useless. Per-message providerOptions on the system role
+  // matches the Phase 2 pattern in `getCachedSystemMessage`.
+  const messages: ModelMessage[] = [
+    {
+      role: "system",
+      content: SYSTEM_PROMPT,
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
+    },
+    {
+      role: "user",
+      content: `הפרופיל של המשתמש:\n${profileContext}\n\nהמקצועות (top ${top.length}):\n${occContextStr}\n\nהחזר הסבר אישי לכל מקצוע.`,
+    },
+  ];
+
   const result = await generateObject({
     model: anthropic(MODEL_ID),
     schema: ProseSchema,
-    system: `אתה כותב הסברים קצרים בעברית למשתמש שקיבל המלצה על מקצוע. אתה מקבל את הפרופיל שלו (תחומי עניין, כישורים, ערכים, אילוצים) ואת הציונים של מקצוע מסוים, וכותב 3-5 משפטים שמסבירים *למה* המקצוע הזה התאים לו ספציפית. אל תכתוב כללי. אל תחזור על שם המקצוע יותר מפעם. אל תהפוך את הציונים למספרים בטקסט. הסבר את הקשר בין הפרופיל למקצוע — מה במקצוע מתאים למה שהמשתמש סיפר על עצמו, ומה החיסרון/אתגר.
-
-מבנה: משפט פתיחה אישי → 1-2 משפטים על מה מתאים → משפט אחד על אתגר/דבר שצריך לקחת בחשבון → אופציונלי משפט פעולה הבא.`,
-    prompt: `הפרופיל של המשתמש:\n${profileContext}\n\nהמקצועות (top ${top.length}):\n${occContextStr}\n\nהחזר הסבר אישי לכל מקצוע.`,
-    providerOptions: {
-      anthropic: {
-        cacheControl: { type: "ephemeral" },
-      },
-    },
+    messages,
   });
 
   const out: Record<string, string> = {};
