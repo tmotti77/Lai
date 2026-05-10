@@ -46,6 +46,57 @@ export type Database = {
           },
         ]
       }
+      career_profile: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          current_stage: string
+          data: Json
+          extraction_count: number
+          id: string
+          last_extracted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          current_stage?: string
+          data?: Json
+          extraction_count?: number
+          id?: string
+          last_extracted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          current_stage?: string
+          data?: Json
+          extraction_count?: number
+          id?: string
+          last_extracted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "career_profile_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "career_profile_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consents: {
         Row: {
           accepted_at: string
@@ -236,6 +287,15 @@ export type Database = {
           p_conversation_id: string
           p_input_tokens: number
           p_output_tokens: number
+        }
+        Returns: undefined
+      }
+      merge_career_profile: {
+        Args: {
+          p_conversation_id: string
+          p_data: Json
+          p_stage: string
+          p_user_id: string
         }
         Returns: undefined
       }
