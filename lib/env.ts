@@ -20,19 +20,39 @@ const clientEnvSchema = serverEnvSchema.pick({
   NEXT_PUBLIC_SITE_URL: true,
 });
 
+type ServerEnv = z.infer<typeof serverEnvSchema>;
+
 const isServer = typeof window === "undefined";
 
-const parsed = isServer
-  ? serverEnvSchema.safeParse(process.env)
-  : clientEnvSchema.safeParse({
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-    });
-
-if (!parsed.success) {
-  console.error("❌ Invalid environment variables:", parsed.error.flatten().fieldErrors);
-  throw new Error("Invalid environment variables");
+function loadEnv(): ServerEnv {
+  if (isServer) {
+    const parsed = serverEnvSchema.safeParse(process.env);
+    if (!parsed.success) {
+      console.error(
+        "❌ Invalid server environment variables:",
+        parsed.error.flatten().fieldErrors,
+      );
+      throw new Error("Invalid environment variables");
+    }
+    return parsed.data;
+  }
+  // Client side: only NEXT_PUBLIC_* are available. Validate the subset, then
+  // return as ServerEnv with server-only fields left undefined. Next.js's bundler
+  // ensures server-only files (with `import "server-only"`) are never bundled into
+  // client code, so client code cannot accidentally read SUPABASE_SERVICE_ROLE_KEY etc.
+  const parsed = clientEnvSchema.safeParse({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  });
+  if (!parsed.success) {
+    console.error(
+      "❌ Invalid client environment variables:",
+      parsed.error.flatten().fieldErrors,
+    );
+    throw new Error("Invalid environment variables");
+  }
+  return parsed.data as ServerEnv;
 }
 
-export const env = parsed.data;
+export const env = loadEnv();
