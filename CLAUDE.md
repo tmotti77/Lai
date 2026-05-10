@@ -36,6 +36,23 @@ Earlier sketches considered Next.js + Python FastAPI + OpenAI + Vercel/Render/Ne
 - `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 bite-sized tasks (current)
 - Phases 2–7: write each plan when its phase begins (don't pre-write speculatively)
 
+## Phase 2 architecture (engine core + safety)
+
+The chat is now stage-aware with a 6-stage state machine: `onboarding → interests → skills → values → constraints → wrap → complete`.
+
+- **Stage state lives on `conversations.stage`**. Default `onboarding`.
+- **Stage transitions via Anthropic tool-use.** Claude has access to a `set_stage(next_stage, reason)` tool defined in `lib/ai/tools.ts`. When Claude judges the current stage complete, it calls the tool — server-side `execute` updates the DB and triggers async profile extraction. The tool call doesn't appear in user-visible text. **Known issue (Phase 2 Task 14 finding)**: Claude often won't call the tool spontaneously; the prompt's tool-call directive may need strengthening, OR AI SDK v6 may need `stopWhen: stepCountIs(N)` on `streamText` for tool-execute to fire reliably.
+- **Per-stage system prompts**: `lib/ai/prompts/stages/*.ts`. `assembleSystemPrompt(stage)` in `lib/ai/prompts/system.ts` composes the base prompt + stage overlay. The composed prompt is what gets `cache_control: ephemeral`. With ~2000 input tokens we now cross Sonnet 4.6's cache threshold; **caches write but reads are showing NULL — investigate before next user testing**.
+- **Profile extraction**: separate `generateObject` call at stage boundaries (`lib/ai/extraction.ts`) using the `ProfileSchema` zod schema. Extracts interests / skills / values / constraints depending on stage. Result merged into `career_profile.data` JSONB via the `merge_career_profile` RPC. Runs async after the stream finishes; failures are logged but don't block the user.
+- **Two-layer safety detector** in `lib/ai/safety/`. Runs on EVERY user turn before any LLM call:
+  1. `regex.ts` — Hebrew + English crisis/distress patterns. Cheap, runs always. **This is the legal floor.**
+  2. `classifier.ts` — Anthropic LLM classifier. Runs when regex hits "distress" (may upgrade to "crisis") or message is ≥80 chars without a regex hit (catches missed phrasings).
+  3. `index.ts` — `checkUserMessage` combines both. On any hit, the chat route short-circuits: persists user msg + the predefined `he.safety.distressFallback` response (both flagged `safety_flag='distress'/'crisis'`), returns a manually-constructed SSE stream. **No Anthropic call is made.**
+- **`career_profile` table** is hybrid: structured top-level columns (`user_id`, `conversation_id`, `current_stage`, `extraction_count`, `last_extracted_at`) + JSONB `data` for the evolving profile shape. The `merge_career_profile` RPC does atomic upsert + deep-merge.
+- **Cache observability**: every assistant turn logs `inputTokens`, `outputTokens`, `cacheRead`, `cacheWrite` to the server console + persists `cache_read_tokens` / `cache_write_tokens` columns. Use these to diagnose caching behavior.
+
+**Architectural rule, do not bypass**: `checkUserMessage` MUST run on every user turn before any `streamText` call. If you're touching `app/api/chat/route.ts`, the safety pre-check is the first thing the route does after parsing the body. This is a *legal* protection, not just a quality one.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.
