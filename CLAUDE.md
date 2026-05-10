@@ -33,8 +33,10 @@ Earlier sketches considered Next.js + Python FastAPI + OpenAI + Vercel/Render/Ne
 ## Plans
 
 - `docs/superpowers/plans/2026-05-10-career-os-00-master-roadmap.md` — 7-phase roadmap, decisions, KPIs, risks
-- `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 bite-sized tasks (current)
-- Phases 2–7: write each plan when its phase begins (don't pre-write speculatively)
+- `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 (foundation, merged)
+- `docs/superpowers/plans/2026-05-10-career-os-02-conversation-engine.md` — Phase 2 (chat engine + safety, merged)
+- `docs/superpowers/plans/2026-05-10-career-os-03a-formal-assessments.md` — Phase 3a (formal assessments, current)
+- Phases 3b–7: write each plan when its phase begins (don't pre-write speculatively). Phase 3 was split into 3a (formal assessments) and 3b (CV upload + skill extraction).
 
 ## Phase 2 architecture (engine core + safety)
 
@@ -52,6 +54,17 @@ The chat is now stage-aware with a 6-stage state machine: `onboarding → intere
 - **Cache observability**: every assistant turn logs `inputTokens`, `outputTokens`, `cacheRead`, `cacheWrite` to the server console + persists `cache_read_tokens` / `cache_write_tokens` columns. Use these to diagnose caching behavior.
 
 **Architectural rule, do not bypass**: `checkUserMessage` MUST run on every user turn before any `streamText` call. If you're touching `app/api/chat/route.ts`, the safety pre-check is the first thing the route does after parsing the body. This is a *legal* protection, not just a quality one.
+
+## Phase 3a architecture (formal assessments)
+
+Four formal assessment surfaces live under `/assessment`: RIASEC (30 items), Big5 (20 items, IPIP-NEO short form with reverse-keyed acquiescence control), values picker (pick 5 of 12 + rank 3), and a constraints form. The hub at `/assessment` shows per-type completion status; each assessment has its own deep-link page at `/assessment/{riasec,big5,values,constraints}`.
+
+- **Items live in code** (`lib/assessment/<type>/items.ts`), not DB. Each items file exports an `_ITEMS_VERSION` integer; every persisted submission stores its `items_version`. If items get reworded, historical scores remain interpretable against the version that was active at submission time.
+- **Scoring is pure deterministic TypeScript** in `lib/assessment/<type>/score.ts` — same architectural rule as the matching engine. RIASEC: per-type sum normalized 0..100 + Holland code (top 3 letters, ties broken by `RIASEC_TYPES` declaration order: R, I, A, S, E, C). Big5: reverse-key inversion (`6 - raw` for items flagged `reverseKeyed`), then per-trait normalize. Values: `validateValuesSubmission` enforces picked.length===5, ranked.length===3, ranked⊆picked, no duplicates. Constraints: zod schema with field bounds (`time_per_week_hours: 0..60`, `training_budget_nis: 0..200_000`, etc.).
+- **`assessments` table**: one row per submission (history-preserving). Latest-per-type retrieved via `ORDER BY taken_at DESC` then dedupe-in-memory. `getProfile()` in `lib/db/profile.ts` JOINs the latest row per type into a `formal` key on the returned profile.
+- **DB layer creates its own service-role client.** `lib/db/assessments.ts` calls `createServiceClient()` internally — same pattern as `lib/db/queries.ts` from Phase 2. Routes pass only the resolved `userId`, not a Supabase client. **The RLS policy only matches `auth.uid()`; the cookie-based anon-key client cannot insert assessments for anonymous users.** This is a real constraint — if you write a new caller, use the service-role pattern.
+- **Submit endpoint**: one unified `POST /api/assessment/submit` with a zod `discriminatedUnion("type", [...])`. Per-type completeness pre-check (riasec/big5 must have all expected item ids) runs **before** opening a DB connection — bad client requests fail-fast with 400.
+- **Items v1 quality flag**: the Hebrew items in `lib/assessment/<type>/items.ts` are best-effort and need a Hebrew-speaking psychologist's review before public launch. Tracked as a Phase 7 launch-checklist item, not a blocker for Phase 4 matching engine work.
 
 ## Project-specific conventions
 
