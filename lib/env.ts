@@ -20,26 +20,12 @@ const clientEnvSchema = serverEnvSchema.pick({
   NEXT_PUBLIC_SITE_URL: true,
 });
 
-type ServerEnv = z.infer<typeof serverEnvSchema>;
+export type ServerEnv = z.infer<typeof serverEnvSchema>;
+export type ClientEnv = z.infer<typeof clientEnvSchema>;
 
 const isServer = typeof window === "undefined";
 
-function loadEnv(): ServerEnv {
-  if (isServer) {
-    const parsed = serverEnvSchema.safeParse(process.env);
-    if (!parsed.success) {
-      console.error(
-        "❌ Invalid server environment variables:",
-        parsed.error.flatten().fieldErrors,
-      );
-      throw new Error("Invalid environment variables");
-    }
-    return parsed.data;
-  }
-  // Client side: only NEXT_PUBLIC_* are available. Validate the subset, then
-  // return as ServerEnv with server-only fields left undefined. Next.js's bundler
-  // ensures server-only files (with `import "server-only"`) are never bundled into
-  // client code, so client code cannot accidentally read SUPABASE_SERVICE_ROLE_KEY etc.
+function loadClientEnv(): ClientEnv {
   const parsed = clientEnvSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -50,9 +36,41 @@ function loadEnv(): ServerEnv {
       "❌ Invalid client environment variables:",
       parsed.error.flatten().fieldErrors,
     );
-    throw new Error("Invalid environment variables");
+    throw new Error("Invalid client environment variables");
   }
-  return parsed.data as ServerEnv;
+  return parsed.data;
 }
 
-export const env = loadEnv();
+function loadServerEnv(): ServerEnv {
+  const parsed = serverEnvSchema.safeParse(process.env);
+  if (!parsed.success) {
+    console.error(
+      "❌ Invalid server environment variables:",
+      parsed.error.flatten().fieldErrors,
+    );
+    throw new Error("Invalid server environment variables");
+  }
+  return parsed.data;
+}
+
+/**
+ * Public env (NEXT_PUBLIC_* only). Safe to use in client and server code.
+ */
+export const clientEnv: ClientEnv = loadClientEnv();
+
+/**
+ * Server-only env including secrets. Files that import this MUST also
+ * `import "server-only"` so the bundler refuses to ship them to the browser.
+ *
+ * On the client this is a Proxy that throws on any property access — defense
+ * in depth in case a `server-only` guard is missed during refactoring.
+ */
+export const serverEnv: ServerEnv = isServer
+  ? loadServerEnv()
+  : new Proxy({} as ServerEnv, {
+      get(_target, prop) {
+        throw new Error(
+          `serverEnv.${String(prop)} accessed on the client — the importing file must have \`import "server-only";\``,
+        );
+      },
+    });

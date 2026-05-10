@@ -10,6 +10,7 @@ export function MessageBubble({ role, text }: Props) {
   return (
     <div className={cn("flex w-full", isUser ? "justify-start" : "justify-end")}>
       <div
+        dir="auto"
         className={cn(
           "max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
           isUser

@@ -1,13 +1,13 @@
 import "server-only";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ModelMessage } from "ai";
-import { env } from "@/lib/env";
+import { serverEnv } from "@/lib/env";
 import { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION } from "@/lib/ai/prompts/system";
 
-export const MODEL_ID = env.ANTHROPIC_MODEL;
+export const MODEL_ID = serverEnv.ANTHROPIC_MODEL;
 
 export const anthropic = createAnthropic({
-  apiKey: env.ANTHROPIC_API_KEY,
+  apiKey: serverEnv.ANTHROPIC_API_KEY,
 });
 
 /**

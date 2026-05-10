@@ -21,12 +21,43 @@ export async function getOrCreateAnonymousUserId(authedUserId?: string): Promise
   const svc = createServiceClient();
 
   if (authedUserId) {
-    const { data } = await svc
+    // Already-promoted: this auth_id has its own users row.
+    const { data: existing } = await svc
       .from("users")
       .select("id")
       .eq("auth_id", authedUserId)
       .maybeSingle();
-    if (data) return data.id;
+    if (existing) return existing.id;
+
+    // First-time sign-in: if a co_anon cookie points at an existing anonymous
+    // users row, PROMOTE it in place so all the user's pre-signup conversations,
+    // consents, and assessments stay attached. Otherwise they'd be orphaned.
+    const anonToken = cookieStore.get(ANON_COOKIE_NAME)?.value;
+    if (anonToken) {
+      const { data: anonSession } = await svc
+        .from("anonymous_sessions")
+        .select("user_id")
+        .eq("token", anonToken)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (anonSession) {
+        const { data: promoted } = await svc
+          .from("users")
+          .update({ auth_id: authedUserId, is_anonymous: false })
+          .eq("id", anonSession.user_id)
+          .eq("is_anonymous", true)
+          .select("id")
+          .maybeSingle();
+        if (promoted) {
+          // Clean up the anonymous session so the cookie is no longer the source of truth.
+          await svc.from("anonymous_sessions").delete().eq("token", anonToken);
+          cookieStore.delete(ANON_COOKIE_NAME);
+          return promoted.id;
+        }
+      }
+    }
+
+    // Fresh authed user with no prior anonymous footprint.
     const { data: created } = await svc
       .from("users")
       .insert({ auth_id: authedUserId, is_anonymous: false })

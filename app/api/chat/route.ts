@@ -69,6 +69,21 @@ export async function POST(req: Request) {
         cacheWriteTokens: cache.cacheCreationInputTokens,
       });
     },
+    onError: async ({ error }) => {
+      // Log to server logs and persist a system row so the conversation has a record
+      // of the failure. This prevents the half-streamed-then-silent-close UX where the
+      // client's `useChat` shows an error but the DB has no trace of what went wrong.
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[chat] streamText error", { conversationId: conversation.id, error: message });
+      await appendMessage({
+        conversationId: conversation.id,
+        role: "system",
+        content: `[stream-error] ${message}`,
+        safetyFlag: "stream-error",
+      }).catch((err) => {
+        console.error("[chat] failed to persist error row", err);
+      });
+    },
   });
 
   return result.toUIMessageStreamResponse({

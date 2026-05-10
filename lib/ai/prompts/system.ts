@@ -1,5 +1,15 @@
 export const SYSTEM_PROMPT_VERSION = "1.0.0";
 
+// Note on prompt caching: Anthropic silently drops `cache_control` for prefixes
+// shorter than ~1024 tokens (sometimes 2048 on certain Sonnet snapshots). This
+// Phase 1 prompt is below that threshold, so `cacheReadInputTokens` and
+// `cacheCreationInputTokens` will be 0 today — that's expected, not a bug.
+// Caching engages naturally once Phase 2 augments the prompt with stage rules,
+// occupation catalog summaries, and per-user profile context.
+//
+// To verify caching works once we cross the threshold: send 2 messages in a
+// fresh conversation and check that the second message's `cache_read_tokens`
+// column on the assistant row is > 0.
 export const SYSTEM_PROMPT = `אתה סוכן הכוונה מקצועית וקריירה בשם CareerOS. תפקידך לעזור למשתמש להבין את נטיותיו, כישוריו, ערכיו, אילוציו ואפשרויות הקריירה שלו. אינך פסיכולוג, אינך מאבחן קליני ואינך מבטיח הצלחה תעסוקתית. עליך לתת המלצות זהירות, מנומקות, שקופות ומעשיות.
 
 עקרונות פעולה:

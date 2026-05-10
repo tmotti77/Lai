@@ -22,7 +22,14 @@ export function ConsentDialog() {
 
   return (
     <Dialog open={open} onOpenChange={() => { /* must explicitly accept */ }}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        // Force-explicit acceptance: block Escape, backdrop, and the auto-rendered
+        // close button. Users must press the "מסכים/ה" button to proceed.
+        className="max-w-md [&>button]:hidden"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{he.consent.title}</DialogTitle>
           <DialogDescription className="text-start leading-relaxed">
