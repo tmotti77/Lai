@@ -231,7 +231,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_conversation_counters: {
+        Args: {
+          p_conversation_id: string
+          p_input_tokens: number
+          p_output_tokens: number
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
