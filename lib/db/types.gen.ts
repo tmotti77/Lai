@@ -135,6 +135,24 @@ export type Database = {
           },
         ]
       }
+      catalog_version: {
+        Row: {
+          id: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          id?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          id?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       consents: {
         Row: {
           accepted_at: string
@@ -269,6 +287,122 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      occupations: {
+        Row: {
+          big5_fit: Json | null
+          constraints: Json
+          created_at: string
+          data_source: string
+          description_he: string
+          desired_skills: Json
+          id: string
+          last_verified_at: string
+          market: Json
+          required_skills: Json
+          riasec_affinity: Json
+          title_en: string
+          title_he: string
+          updated_at: string
+          values_fit: string[]
+        }
+        Insert: {
+          big5_fit?: Json | null
+          constraints: Json
+          created_at?: string
+          data_source: string
+          description_he: string
+          desired_skills: Json
+          id: string
+          last_verified_at: string
+          market: Json
+          required_skills: Json
+          riasec_affinity: Json
+          title_en: string
+          title_he: string
+          updated_at?: string
+          values_fit?: string[]
+        }
+        Update: {
+          big5_fit?: Json | null
+          constraints?: Json
+          created_at?: string
+          data_source?: string
+          description_he?: string
+          desired_skills?: Json
+          id?: string
+          last_verified_at?: string
+          market?: Json
+          required_skills?: Json
+          riasec_affinity?: Json
+          title_en?: string
+          title_he?: string
+          updated_at?: string
+          values_fit?: string[]
+        }
+        Relationships: []
+      }
+      recommendations: {
+        Row: {
+          generated_at: string
+          id: string
+          paths: Json
+          profile_hash: string
+          prose: Json
+          rankings: Json
+          user_id: string
+        }
+        Insert: {
+          generated_at?: string
+          id?: string
+          paths: Json
+          profile_hash: string
+          prose: Json
+          rankings: Json
+          user_id: string
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          paths?: Json
+          profile_hash?: string
+          prose?: Json
+          rankings?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skills: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name_he: string
+          related_ids: string[]
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id: string
+          name_he: string
+          related_ids?: string[]
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name_he?: string
+          related_ids?: string[]
+        }
+        Relationships: []
       }
       users: {
         Row: {
