@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
+import { ConsentDialog } from "./ConsentDialog";
 import { he } from "@/lib/i18n/he";
 
 export function ChatShell() {
@@ -16,6 +17,7 @@ export function ChatShell() {
 
   return (
     <div className="mx-auto flex h-dvh max-w-2xl flex-col">
+      <ConsentDialog />
       <DisclaimerBanner />
       <header className="border-b border-border px-4 py-3">
         <h1 className="text-base font-semibold">{he.chat.headerTitle}</h1>
