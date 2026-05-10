@@ -1,16 +1,47 @@
 @import "tailwindcss";
 
 @theme {
+  /* Typography */
   --font-sans: var(--font-heebo), ui-sans-serif, system-ui, sans-serif;
+
+  /* Base colors */
   --color-background: oklch(0.99 0 0);
   --color-foreground: oklch(0.18 0.01 260);
+
+  /* Card */
+  --color-card: oklch(0.99 0 0);
+  --color-card-foreground: oklch(0.18 0.01 260);
+
+  /* Popover */
+  --color-popover: oklch(0.99 0 0);
+  --color-popover-foreground: oklch(0.18 0.01 260);
+
+  /* Muted */
   --color-muted: oklch(0.96 0.005 260);
   --color-muted-foreground: oklch(0.45 0.01 260);
+
+  /* Border / Input / Ring */
   --color-border: oklch(0.92 0.005 260);
+  --color-input: oklch(0.92 0.005 260);
+  --color-ring: oklch(0.55 0.15 250);
+
+  /* Primary */
   --color-primary: oklch(0.55 0.15 250);
   --color-primary-foreground: oklch(0.99 0 0);
+
+  /* Secondary */
+  --color-secondary: oklch(0.96 0.005 260);
+  --color-secondary-foreground: oklch(0.18 0.01 260);
+
+  /* Accent */
   --color-accent: oklch(0.95 0.03 250);
+  --color-accent-foreground: oklch(0.18 0.01 260);
+
+  /* Destructive */
   --color-destructive: oklch(0.55 0.20 25);
+  --color-destructive-foreground: oklch(0.99 0 0);
+
+  /* Radius */
   --radius: 0.625rem;
 }
 
@@ -18,10 +49,28 @@
   :root {
     --color-background: oklch(0.13 0.01 260);
     --color-foreground: oklch(0.90 0 0);
+
+    --color-card: oklch(0.16 0.01 260);
+    --color-card-foreground: oklch(0.90 0 0);
+
+    --color-popover: oklch(0.16 0.01 260);
+    --color-popover-foreground: oklch(0.90 0 0);
+
     --color-muted: oklch(0.20 0.01 260);
     --color-muted-foreground: oklch(0.65 0.01 260);
+
     --color-border: oklch(0.25 0.01 260);
+    --color-input: oklch(0.25 0.01 260);
+    --color-ring: oklch(0.65 0.15 250);
+
+    --color-secondary: oklch(0.20 0.01 260);
+    --color-secondary-foreground: oklch(0.90 0 0);
+
     --color-accent: oklch(0.22 0.03 250);
+    --color-accent-foreground: oklch(0.90 0 0);
+
+    --color-destructive: oklch(0.60 0.20 25);
+    --color-destructive-foreground: oklch(0.99 0 0);
   }
 }
 
