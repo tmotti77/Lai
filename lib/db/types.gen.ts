@@ -46,6 +46,44 @@ export type Database = {
           },
         ]
       }
+      assessments: {
+        Row: {
+          id: string
+          items_version: number
+          responses: Json
+          scores: Json
+          taken_at: string
+          type: Database["public"]["Enums"]["assessment_type"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          items_version: number
+          responses: Json
+          scores: Json
+          taken_at?: string
+          type: Database["public"]["Enums"]["assessment_type"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          items_version?: number
+          responses?: Json
+          scores?: Json
+          taken_at?: string
+          type?: Database["public"]["Enums"]["assessment_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       career_profile: {
         Row: {
           conversation_id: string | null
@@ -301,7 +339,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      assessment_type: "riasec" | "big5" | "values" | "constraints"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -428,6 +466,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      assessment_type: ["riasec", "big5", "values", "constraints"],
+    },
   },
 } as const
