@@ -43,33 +43,40 @@ export async function POST(req: Request) {
     );
   }
 
+  const submission = parsed.data;
+
+  // Pre-check completeness for the likert assessments before opening a DB
+  // connection. Bad client requests fail-fast without a Supabase round-trip.
+  if (submission.type === "riasec") {
+    const expected = new Set(RIASEC_ITEMS.map((i) => i.id));
+    const got = new Set(Object.keys(submission.responses));
+    if (got.size !== expected.size || ![...expected].every((id) => got.has(id))) {
+      return Response.json({ error: "incomplete_riasec" }, { status: 400 });
+    }
+  }
+  if (submission.type === "big5") {
+    const expected = new Set(BIG5_ITEMS.map((i) => i.id));
+    const got = new Set(Object.keys(submission.responses));
+    if (got.size !== expected.size || ![...expected].every((id) => got.has(id))) {
+      return Response.json({ error: "incomplete_big5" }, { status: 400 });
+    }
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const internalUserId = await getOrCreateAnonymousUserId(user?.id);
 
   try {
-    const submission = parsed.data;
     let scores: unknown;
     let itemsVersion: number;
 
     switch (submission.type) {
       case "riasec": {
-        // Verify all RIASEC item ids present
-        const expected = new Set(RIASEC_ITEMS.map((i) => i.id));
-        const got = new Set(Object.keys(submission.responses));
-        if (got.size !== expected.size || ![...expected].every((id) => got.has(id))) {
-          return Response.json({ error: "incomplete_riasec" }, { status: 400 });
-        }
         scores = scoreRiasec(submission.responses, RIASEC_ITEMS_VERSION);
         itemsVersion = RIASEC_ITEMS_VERSION;
         break;
       }
       case "big5": {
-        const expected = new Set(BIG5_ITEMS.map((i) => i.id));
-        const got = new Set(Object.keys(submission.responses));
-        if (got.size !== expected.size || ![...expected].every((id) => got.has(id))) {
-          return Response.json({ error: "incomplete_big5" }, { status: 400 });
-        }
         scores = scoreBig5(submission.responses, BIG5_ITEMS_VERSION);
         itemsVersion = BIG5_ITEMS_VERSION;
         break;

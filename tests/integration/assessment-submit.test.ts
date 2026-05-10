@@ -16,12 +16,11 @@ describe("POST /api/assessment/submit", () => {
     expect(res.status).toBe(400);
   });
 
-  // Skipped: route calls createClient() (which invokes next/headers `cookies()`)
-  // BEFORE the riasec-completeness check, so we can't reach the 400 path without
-  // a request scope. Validating this requires E2E (Playwright) or a request-scope shim.
-  it.skip("rejects incomplete RIASEC", async () => {
+  it("rejects incomplete RIASEC", async () => {
     const res = await submitPost(fakeRequest({ type: "riasec", responses: { R1: 3 } }));
     expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe("incomplete_riasec");
   });
 
   // Skipped: success path calls createClient() + getOrCreateAnonymousUserId() +
