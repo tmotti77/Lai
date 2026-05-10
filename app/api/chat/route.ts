@@ -64,8 +64,9 @@ export async function POST(req: Request) {
       content: m.content,
     }));
 
+  // TODO(Phase 2 Task 13): pass conversation.stage instead of hardcoded onboarding
   const messages: ModelMessage[] = [
-    getCachedSystemMessage(),
+    getCachedSystemMessage("onboarding"),
     ...historyAsModelMessages,
   ];
 

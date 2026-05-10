@@ -2,7 +2,8 @@ import "server-only";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ModelMessage } from "ai";
 import { serverEnv } from "@/lib/env";
-import { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION } from "@/lib/ai/prompts/system";
+import { assembleSystemPrompt, SYSTEM_PROMPT_VERSION } from "@/lib/ai/prompts/system";
+import type { Stage } from "@/lib/ai/stages";
 
 export const MODEL_ID = serverEnv.ANTHROPIC_MODEL;
 
@@ -11,15 +12,15 @@ export const anthropic = createAnthropic({
 });
 
 /**
- * Returns the system message as a ModelMessage with Anthropic ephemeral cache control.
- * The cache_control marker tells Anthropic to cache this prefix for ~5 minutes.
- * Cache control is a *provider* concept and only applies to ModelMessages — UIMessage
- * does not carry providerOptions, so this must NEVER be used as a UI message.
+ * Returns the system message for the given stage, with Anthropic ephemeral
+ * cache control applied. The base prompt + per-stage overlay are composed at
+ * call time. Cache control is a *provider* concept and only applies to
+ * ModelMessages — UIMessage does not carry providerOptions.
  */
-export function getCachedSystemMessage(): ModelMessage {
+export function getCachedSystemMessage(stage: Stage): ModelMessage {
   return {
     role: "system",
-    content: SYSTEM_PROMPT,
+    content: assembleSystemPrompt(stage),
     providerOptions: {
       anthropic: { cacheControl: { type: "ephemeral" } },
     },
