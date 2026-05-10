@@ -1,0 +1,37 @@
+{
+  "id": "nurse",
+  "title_he": "אח/ות מוסמכ/ת",
+  "title_en": "Registered Nurse",
+  "description_he": "טיפול ישיר במטופלים בבתי חולים, קופות חולים או בקהילה — מתן תרופות, מעקב סימנים חיוניים, ליווי משפחות, ועבודה בצוות עם רופאים. שילוב של אחריות רפואית, חמלה, ועמידה בלחץ במשמרות מתחלפות. עבודה משמעותית מאוד, מתאימה למי שאוהב/ת אנשים.",
+  "riasec_affinity": { "R": 0.65, "I": 0.55, "A": 0.20, "S": 0.90, "E": 0.30, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "first-aid", "importance": 1.0 },
+    { "skill_id": "anatomy", "importance": 0.9 },
+    { "skill_id": "empathy", "importance": 0.9 },
+    { "skill_id": "communication", "importance": 0.85 },
+    { "skill_id": "stress-tolerance", "importance": 0.85 },
+    { "skill_id": "physical-stamina", "importance": 0.75 }
+  ],
+  "desired_skills": [
+    { "skill_id": "patience", "importance": 0.6 },
+    { "skill_id": "attention-to-detail", "importance": 0.6 },
+    { "skill_id": "english-business", "importance": 0.4 }
+  ],
+  "values_fit": ["impact", "service", "stability", "team"],
+  "big5_fit": { "A": 75, "C": 70 },
+  "constraints": {
+    "typical_training_months": 36,
+    "typical_training_cost_nis": 20000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה", "צפון", "דרום", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "very_high",
+    "typical_salary_nis_min": 11000,
+    "typical_salary_nis_max": 22000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

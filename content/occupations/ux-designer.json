@@ -1,0 +1,36 @@
+{
+  "id": "ux-designer",
+  "title_he": "מעצב/ת UX/UI",
+  "title_en": "UX/UI Designer",
+  "description_he": "עיצוב חוויית משתמש וממשקים למוצרים דיגיטליים. עריכת ראיונות משתמשים, בניית wireframes ופרוטוטייפים, ועבודה צמודה עם מפתחים ומנהלי מוצר. שילוב של חשיבה ויזואלית, אמפתיה למשתמש, וכישורים אנליטיים.",
+  "riasec_affinity": { "R": 0.20, "I": 0.55, "A": 0.85, "S": 0.55, "E": 0.30, "C": 0.40 },
+  "required_skills": [
+    { "skill_id": "ux-design", "importance": 1.0 },
+    { "skill_id": "ui-design", "importance": 0.9 },
+    { "skill_id": "graphic-design", "importance": 0.65 },
+    { "skill_id": "communication", "importance": 0.7 },
+    { "skill_id": "english-business", "importance": 0.6 }
+  ],
+  "desired_skills": [
+    { "skill_id": "creativity", "importance": 0.6 },
+    { "skill_id": "research-skills", "importance": 0.5 },
+    { "skill_id": "presentation", "importance": 0.45 }
+  ],
+  "values_fit": ["creativity", "impact", "freedom", "variety", "learning"],
+  "big5_fit": { "O": 80, "A": 60 },
+  "constraints": {
+    "typical_training_months": 10,
+    "typical_training_cost_nis": 25000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 16000,
+    "typical_salary_nis_max": 35000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

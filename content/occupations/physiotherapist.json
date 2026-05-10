@@ -1,0 +1,37 @@
+{
+  "id": "physiotherapist",
+  "title_he": "פיזיותרפיסט/ית",
+  "title_en": "Physiotherapist",
+  "description_he": "טיפול בתנועה ובכאב באמצעות תרגול, מגע ושיקום. עבודה אחד-על-אחד עם מטופלים אחרי פציעות, ניתוחים, או מצבים כרוניים. שילוב של ידע אנטומי עמוק, יכולת הוראה והמרצה, ועבודה פיזית עם הידיים. תפקיד אקדמי שמצריך תואר ראשון ורישוי.",
+  "riasec_affinity": { "R": 0.70, "I": 0.65, "A": 0.30, "S": 0.85, "E": 0.30, "C": 0.45 },
+  "required_skills": [
+    { "skill_id": "anatomy", "importance": 1.0 },
+    { "skill_id": "physical-stamina", "importance": 0.85 },
+    { "skill_id": "empathy", "importance": 0.85 },
+    { "skill_id": "communication", "importance": 0.8 },
+    { "skill_id": "manual-dexterity", "importance": 0.75 },
+    { "skill_id": "patience", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "teaching", "importance": 0.55 },
+    { "skill_id": "research-skills", "importance": 0.4 },
+    { "skill_id": "first-aid", "importance": 0.5 }
+  ],
+  "values_fit": ["impact", "service", "stability", "balance"],
+  "big5_fit": { "A": 70, "C": 65 },
+  "constraints": {
+    "typical_training_months": 48,
+    "typical_training_cost_nis": 35000,
+    "requires_english_level": "intermediate",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה", "צפון", "דרום", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 12000,
+    "typical_salary_nis_max": 25000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

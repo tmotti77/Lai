@@ -1,0 +1,37 @@
+{
+  "id": "software-developer",
+  "title_he": "מפתח/ת תוכנה",
+  "title_en": "Software Developer",
+  "description_he": "כתיבת קוד שמייצר מוצרים דיגיטליים — אפליקציות אינטרנט, מובייל, או מערכות עורף. עבודה בצוות עם מנהלי מוצר, מעצבים, ומפתחים אחרים. שילוב חזק של פתרון בעיות ושפת תכנות מסוימת.",
+  "riasec_affinity": { "R": 0.30, "I": 0.85, "A": 0.45, "S": 0.30, "E": 0.20, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "programming-general", "importance": 1.0 },
+    { "skill_id": "javascript", "importance": 0.7 },
+    { "skill_id": "sql", "importance": 0.5 },
+    { "skill_id": "english-business", "importance": 0.7 },
+    { "skill_id": "self-direction", "importance": 0.6 }
+  ],
+  "desired_skills": [
+    { "skill_id": "react", "importance": 0.5 },
+    { "skill_id": "python", "importance": 0.4 },
+    { "skill_id": "linux-cli", "importance": 0.4 },
+    { "skill_id": "communication", "importance": 0.5 }
+  ],
+  "values_fit": ["learning", "challenge", "money", "creativity", "freedom"],
+  "big5_fit": { "O": 70, "C": 65 },
+  "constraints": {
+    "typical_training_months": 9,
+    "typical_training_cost_nis": 50000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה"]
+  },
+  "market": {
+    "demand_he": "very_high",
+    "typical_salary_nis_min": 18000,
+    "typical_salary_nis_max": 45000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

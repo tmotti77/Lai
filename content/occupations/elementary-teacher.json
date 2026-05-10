@@ -1,0 +1,36 @@
+{
+  "id": "elementary-teacher",
+  "title_he": "מורה בבית ספר יסודי",
+  "title_en": "Elementary School Teacher",
+  "description_he": "הוראת מקצועות בסיסיים לילדים בכיתות א-ו. תכנון שיעורים, ניהול כיתה, מעקב התפתחותי, וקשר עם הורים. תפקיד עם משמעות חברתית גבוהה ולוח זמנים שמסתדר עם משפחה צעירה.",
+  "riasec_affinity": { "R": 0.20, "I": 0.40, "A": 0.55, "S": 0.95, "E": 0.40, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "teaching", "importance": 1.0 },
+    { "skill_id": "patience", "importance": 0.9 },
+    { "skill_id": "communication", "importance": 0.85 },
+    { "skill_id": "child-development", "importance": 0.75 },
+    { "skill_id": "writing-he", "importance": 0.6 }
+  ],
+  "desired_skills": [
+    { "skill_id": "creativity", "importance": 0.6 },
+    { "skill_id": "presentation", "importance": 0.5 },
+    { "skill_id": "stress-tolerance", "importance": 0.5 }
+  ],
+  "values_fit": ["impact", "service", "team", "balance", "stability"],
+  "big5_fit": { "A": 70, "C": 65 },
+  "constraints": {
+    "typical_training_months": 36,
+    "typical_training_cost_nis": 30000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "צפון", "דרום", "ירושלים", "שרון", "חיפה", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 8000,
+    "typical_salary_nis_max": 14000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

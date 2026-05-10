@@ -1,0 +1,38 @@
+{
+  "id": "industrial-engineer",
+  "title_he": "מהנדס/ת תעשייה וניהול",
+  "title_en": "Industrial Engineer",
+  "description_he": "ייעול תהליכים בארגונים — קווי ייצור, לוגיסטיקה, שירות, ובינה עסקית. מיפוי תהליך, איסוף וניתוח נתונים, ובניית פתרונות שמשפרים תפוקה ועלות. תואר רחב שפותח דלתות לתעשייה, היי-טק, ויעוץ. מתאים למי שאוהב/ת לסדר מערכות מורכבות.",
+  "riasec_affinity": { "R": 0.45, "I": 0.75, "A": 0.20, "S": 0.40, "E": 0.55, "C": 0.85 },
+  "required_skills": [
+    { "skill_id": "industrial-engineering", "importance": 1.0 },
+    { "skill_id": "process-design", "importance": 0.9 },
+    { "skill_id": "project-management", "importance": 0.75 },
+    { "skill_id": "spreadsheets", "importance": 0.8 },
+    { "skill_id": "data-analysis", "importance": 0.7 },
+    { "skill_id": "communication", "importance": 0.65 }
+  ],
+  "desired_skills": [
+    { "skill_id": "operations", "importance": 0.6 },
+    { "skill_id": "team-leadership", "importance": 0.5 },
+    { "skill_id": "english-business", "importance": 0.5 },
+    { "skill_id": "sql", "importance": 0.4 }
+  ],
+  "values_fit": ["stability", "money", "challenge", "variety", "learning"],
+  "big5_fit": { "C": 75, "O": 60 },
+  "constraints": {
+    "typical_training_months": 48,
+    "typical_training_cost_nis": 40000,
+    "requires_english_level": "intermediate",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה", "צפון", "דרום", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 14000,
+    "typical_salary_nis_max": 30000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}
