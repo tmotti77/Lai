@@ -120,6 +120,63 @@ export const he = {
       },
     },
   },
+  recommendations: {
+    title: "המלצות הקריירה שלך",
+    subtitle: "שלושה מסלולים שונים שעולים מהפרופיל שלך. כל אחד עם הסבר אישי, פירוט ציונים, ואתגרים אפשריים.",
+    pathLabels: {
+      safe: "מסלול בטוח",
+      growth: "מסלול צמיחה",
+      wildcard: "מסלול ג'וקר",
+    },
+    pathDescriptions: {
+      safe: "מתאים למה שאתה כבר יכול לעשות מהר, עם ביקוש גבוה והשקעה נמוכה.",
+      growth: "מתאים אם אתה מוכן ללמוד 6-18 חודשים, עם פוטנציאל גבוה יותר.",
+      wildcard: "כיוון פחות מובן מאליו אבל עם פוטנציאל מעניין בשבילך.",
+    },
+    breakdown: {
+      title: "פירוט ההתאמה",
+      labels: {
+        interests: "תחומי עניין",
+        skills: "כישורים",
+        values: "ערכים",
+        big5: "אופי",
+        constraints: "אילוצים",
+        market: "שוק העבודה",
+      },
+      missing: "אין נתונים",
+    },
+    market: {
+      demand: "ביקוש",
+      salary: "טווח שכר",
+      training: "זמן הכשרה",
+      months: "חודשים",
+      noTraining: "ללא הכשרה רשמית",
+      ai_risk: "סיכון אוטומציה",
+    },
+    demandLabels: {
+      low: "נמוך",
+      medium: "בינוני",
+      high: "גבוה",
+      very_high: "גבוה מאוד",
+    },
+    aiRiskLabels: {
+      low: "נמוך",
+      medium: "בינוני",
+      high: "גבוה",
+    },
+    emptyProfile: {
+      title: "צריך עוד קצת מידע",
+      body: "כדי לתת המלצות שמתאימות לך באמת, השלם לפחות שיחה אחת או שאלון אחד.",
+      ctaChat: "התחל שיחה",
+      ctaAssess: "מילוי שאלון",
+    },
+    error: {
+      generic: "לא הצלחנו ליצור המלצות כרגע. נסה שוב בעוד רגע.",
+    },
+    cachedNote: "המלצות שמורות מ-{when}. נרענן אם תוסיף לפרופיל שלך.",
+    regenerate: "צור מחדש",
+    noPathOption: "אין אפשרות מובהקת במסלול הזה לפי הפרופיל הנוכחי שלך.",
+  },
 } as const;
 
 export type HebrewStrings = typeof he;
