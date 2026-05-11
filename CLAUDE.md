@@ -35,8 +35,9 @@ Earlier sketches considered Next.js + Python FastAPI + OpenAI + Vercel/Render/Ne
 - `docs/superpowers/plans/2026-05-10-career-os-00-master-roadmap.md` — 7-phase roadmap, decisions, KPIs, risks
 - `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 (foundation, merged)
 - `docs/superpowers/plans/2026-05-10-career-os-02-conversation-engine.md` — Phase 2 (chat engine + safety, merged)
-- `docs/superpowers/plans/2026-05-10-career-os-03a-formal-assessments.md` — Phase 3a (formal assessments, current)
-- Phases 3b–7: write each plan when its phase begins (don't pre-write speculatively). Phase 3 was split into 3a (formal assessments) and 3b (CV upload + skill extraction).
+- `docs/superpowers/plans/2026-05-10-career-os-03a-formal-assessments.md` — Phase 3a (formal assessments, merged)
+- `docs/superpowers/plans/2026-05-11-career-os-03b-cv-skill-extraction.md` — Phase 3b ("המראה" — streaming CV → skills, current)
+- Phases 4–7 plans: see `docs/superpowers/plans/`. Phase 3 was split into 3a (formal assessments) and 3b (CV upload + skill extraction).
 
 ## Phase 2 architecture (engine core + safety)
 
@@ -112,6 +113,23 @@ Adds the conversion surface: "שמור דוח" button on `/recommendations` open
 - **`SaveReportDialog`** is a thin wrapper around the Phase 1 sign-in pattern but in a Dialog. Same magic-link + Google buttons; redirects to `/auth/callback?next=/recommendations` so the user returns to where they left off, now signed in.
 - **Visibility logic**: anonymous → show "שמור דוח" button; signed-in → show "✓ שמור בחשבון שלך" badge. Toggle via `supabase.auth.onAuthStateChange` subscription so the UI updates immediately after the callback round-trip.
 - **No email-the-PDF feature** in this phase. The magic link IS the email — clicking it lands on `/recommendations` where the user can re-download. "Email me the PDF as attachment" is a Phase 5c.5 polish needing Resend integration.
+
+## Phase 3b architecture (CV upload + skill extraction — "המראה")
+
+Turns a CV upload into a reflective moment: the AI emits a short Hebrew **reflection** that streams character-by-character, while **skill cards** bloom in one-by-one underneath. User taps to dismiss/expand/add, then saves. Confirmed skills replace `career_profile.data.skills` and force-recompute `/api/recommendations`.
+
+- **Three routes, not one**: `useObject` from `@ai-sdk/react` requires JSON POST, so the multipart upload + streaming extraction cannot share an endpoint.
+  - `POST /api/cv/upload` — multipart, validates type/size, uploads to Supabase Storage, parses PDF/DOCX → returns `{id}` (fast, ~1s). Pre-writes `extracted_text` to the row.
+  - `POST /api/cv/extract` — JSON `{cv_upload_id}`, reads `extracted_text` from DB, calls `streamText` with `Output.object({schema})`, returns AI SDK text stream. Client uses `useObject` to render partial objects as they arrive. Persists `reflection_he` + `extracted_skills` to DB in a `void (async () => { ... await result.output; ... })()` side-effect after returning the stream.
+  - `POST /api/cv/confirm` — JSON `{cv_upload_id, skill_ids[]}`, hydrates `name_he` from taxonomy, writes to `career_profile.data.skills`. **First CV confirm only** archives prior chat skills to `data.skills_from_chat` — subsequent re-confirms just replace `.skills`.
+- **AI SDK v6 modern API**: `streamText({ output: Output.object({schema}) })` replaces the deprecated `streamObject`. Same per-message `cacheControl` pattern on the system role as Phase 4 explanations — top-level `providerOptions` would mark the user message (which changes every call) as the cache breakpoint.
+- **pdf-parse v2 has a class-based API** (`new PDFParse({data: buffer})` + `parser.getText()`), not v1's default-function export. Dynamic `await import("pdf-parse")` inside `lib/cv/parse.ts` since `pdf-parse` is server-only and large.
+- **Profile skill shape stores BOTH `id` and `name_he`** (looked up from `content/skills/taxonomy.json` at confirm-time). Phase 4's substring-based skill scorer continues to work unchanged because it reads `name_he`. Phase 4.5 can switch to precise id-based matching without touching Phase 3b.
+- **Skills outside taxonomy** are emitted as `"other:<phrase>"` ids by the LLM. User can promote them inline via Hebrew autocomplete over the taxonomy. `"other:..."` entries land in profile too but don't affect Phase 4 matching score (no `name_he` substring lookup hits).
+- **Streaming UX**: skill cards animate in with a slide-up + fade keyframe (transform/opacity only, ≤200ms per UI rules). Reflection text appears as it streams (no typewriter library — `useObject` updates the React state on each chunk, React re-renders). Rotating status text ("מזהה כישורים טכניים..." → "מחפש ניסיון ניהולי...") is cosmetic and rotates every 2s — doesn't reflect actual LLM progress.
+- **Archetype is deterministic** (`lib/cv/archetype.ts`): dominant category ≥45% → `builder` / `connector` / `analyst` / `leader` / `creator`; otherwise `generalist`. Mapped to Hebrew display names in `he.cv.success.archetypeNames`.
+- **Storage bucket `cv-uploads`** is private, path convention `<user_id>/<uuid>.{pdf,docx}`. Reads/writes go through service-role from app server. Lifecycle (30-day auto-delete) is configured via Supabase Dashboard since pure-SQL primitives don't cover it.
+- **Resume-on-revisit**: `/cv` reads the latest `cv_uploads` row. If `confirmed_at` is null but extraction exists, page lands the user back in the review state with the prior skills selection. If confirmed, lands in success state with re-upload option.
 
 ## Project-specific conventions
 
