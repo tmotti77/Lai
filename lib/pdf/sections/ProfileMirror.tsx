@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "@react-pdf/renderer";
 import { styles, colors } from "../styles";
 import { he } from "@/lib/i18n/he";
+import { VALUES_OPTIONS } from "@/lib/assessment/values/options";
 import type { MatchingProfile } from "@/lib/matching/types";
 
 const labels = he.report.sections.profileMirror;
@@ -44,7 +45,7 @@ export function ProfileMirror({
       {profile.values && (
         <View style={localStyles.block}>
           <Text style={localStyles.label}>{labels.valuesLabel}</Text>
-          <Text style={localStyles.value}>{profile.values.topThree.join(" · ")}</Text>
+          <Text style={localStyles.value}>{profile.values.topThree.map(valueLabelHe).join(" · ")}</Text>
         </View>
       )}
 
@@ -65,6 +66,10 @@ export function ProfileMirror({
       )}
     </View>
   );
+}
+
+function valueLabelHe(id: string): string {
+  return VALUES_OPTIONS.find((opt) => opt.id === id)?.label_he ?? id;
 }
 
 function topRiasecLabel(interests: NonNullable<MatchingProfile["interests"]>): string {

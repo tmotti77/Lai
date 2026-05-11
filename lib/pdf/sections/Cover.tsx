@@ -1,12 +1,18 @@
-import React from "react";
 import { View, Text, StyleSheet } from "@react-pdf/renderer";
-import { styles, colors } from "../styles";
+import { colors } from "../styles";
 import { he } from "@/lib/i18n/he";
 
 const coverStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  brand: { fontSize: 36, fontWeight: "bold", marginBottom: 4, color: colors.accent },
-  title: { fontSize: 22, fontWeight: 600, marginBottom: 12, textAlign: "center" },
+  brand: {
+    fontSize: 36,
+    fontWeight: "bold",
+    lineHeight: 1.2,
+    marginBottom: 24,
+    color: colors.accent,
+    textAlign: "center",
+  },
+  title: { fontSize: 22, fontWeight: 600, lineHeight: 1.3, marginBottom: 12, textAlign: "center" },
   subtitle: { fontSize: 11, color: colors.muted, marginBottom: 32, maxWidth: 380, textAlign: "center", lineHeight: 1.5 },
   meta: { fontSize: 10, color: colors.muted, marginBottom: 8 },
   disclaimer: {
