@@ -12,19 +12,6 @@ export function PlanClient() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  const fetchPlan = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/plan");
-      if (res.ok) {
-        const json = await res.json();
-        setPlan(json);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const generate = async (confirm = true) => {
     if (plan && confirm && !window.confirm(he.plan.regenerateConfirm)) return;
     setGenerating(true);
@@ -59,7 +46,22 @@ export function PlanClient() {
     }
   };
 
-  useEffect(() => { fetchPlan(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/plan");
+        if (cancelled) return;
+        if (res.ok) {
+          const json = await res.json();
+          if (!cancelled) setPlan(json);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading) return <div className="py-16 text-center text-muted-foreground">…</div>;
 

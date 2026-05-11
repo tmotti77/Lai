@@ -59,7 +59,31 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
     setLoading(false);
   };
 
-  useEffect(() => { fetchRecs(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/recommendations", { method: "POST" });
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(he.recommendations.error.generic);
+          return;
+        }
+        const json = (await res.json()) as ApiResponse;
+        if (cancelled) return;
+        if (json.error) {
+          setError(he.recommendations.error.generic);
+        } else {
+          setData(json);
+        }
+      } catch {
+        if (!cancelled) setError(he.recommendations.error.generic);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading && !data) {
     return <div className="py-16 text-center text-muted-foreground">…</div>;
