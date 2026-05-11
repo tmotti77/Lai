@@ -175,6 +175,8 @@ export const he = {
     },
     cachedNote: "המלצות שמורות מ-{when}. נרענן אם תוסיף לפרופיל שלך.",
     regenerate: "צור מחדש",
+    downloadPdf: "הורד דוח PDF",
+    downloadingPdf: "מכין PDF…",
     noPathOption: "אין אפשרות מובהקת במסלול הזה לפי הפרופיל הנוכחי שלך.",
   },
   report: {

@@ -67,6 +67,14 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
           <Button size="sm" variant="ghost" onClick={() => fetchRecs(true)}>{he.recommendations.regenerate}</Button>
         </div>
       )}
+      {data.rankings.length > 0 && (
+        <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm">
+          <div className="text-muted-foreground">{he.report.title}</div>
+          <Button asChild size="sm" variant="outline">
+            <a href="/api/report/pdf" download>{he.recommendations.downloadPdf}</a>
+          </Button>
+        </div>
+      )}
       <ThreePathsView
         rankings={data.rankings}
         paths={data.paths}
