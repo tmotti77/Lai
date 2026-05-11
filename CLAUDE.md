@@ -93,6 +93,17 @@ The PDF report is the user-facing artifact. Triggered from `/recommendations` vi
 - **Spike-then-cleanup pattern** for risky tech: Task 1 ran an RTL spike with `npm run pdf:spike` to validate Hebrew rendering before building the full report. The spike artifacts (`scripts/pdf-spike.ts`, `lib/pdf/spike.tsx`) were deleted after verification. `spike.pdf` is gitignored in case anyone runs a future spike.
 - **Buffer-to-Response cast**: Node `Buffer` is not a Web `BodyInit`. The route casts `new Response(buffer as BodyInit, ...)` — necessary type workaround; runtime behavior is unchanged.
 
+## Phase 5b architecture (30-day plan)
+
+Turns a recommendation into a checkable 30-day action plan. Triggered from `/recommendations` via "צור תוכנית 30 יום" → `/plan` → "Generate" → `POST /api/plan/generate`. Each task is one row in `plan_tasks` so toggles are atomic single-row UPDATEs.
+
+- **Archetype selection is deterministic** (`lib/plan/selectArchetype.ts`): top-1 path slot drives the archetype. Safe → "apply", Growth → "taste_test", Wildcard → "research". The chosen archetype's path occupation is the target the LLM customizes tasks toward.
+- **One LLM call per plan** (`lib/plan/compose.ts`): zod 30-task schema (`day`, `title_he`, `description_he`, `category`, `estimated_minutes`). System prompt is prompt-cached (per the explanations.ts pattern). Profile + top-occupation + Hebrew prose feeds the user message.
+- **One row per task** (`plan_tasks` table): toggle is `UPDATE plan_tasks SET done = $1 WHERE id = $2`. JSONB array would force read-modify-write of all 30 items per toggle — race-prone, slow.
+- **Plans are per-recommendation_id**: regenerating recommendations means regenerating the plan. The route `DELETE`s any old plan for the same recommendation before inserting the new one — keeps "one plan per recommendation" invariant.
+- **Authorization**: anonymous-OK. Same pattern as Phase 4/5a. RLS policy is on `plans` rows; `plan_tasks` policy joins through `plans` to check ownership. Service-role client used in `lib/db/plans.ts`.
+- **UI grouping**: tasks render in 5 sections (week 1: days 1-7, ..., week 5: days 29-30). Each task row has a custom checkbox (a button with `role="checkbox"` and `aria-pressed`). Optimistic toggle UI with rollback on failure.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.
