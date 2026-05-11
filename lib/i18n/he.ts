@@ -238,6 +238,38 @@ export const he = {
       footer: "אינו ייעוץ קליני. לפרטים מלאים — מדיניות הפרטיות ותנאי השימוש באתר.",
     },
   },
+  plan: {
+    title: "תוכנית 30 יום",
+    subtitle: "המסלול שבחרת מתורגם לפעולות יומיות. סמן מה שעשית, חזור מתי שצריך.",
+    archetypeTitles: {
+      apply: "תוכנית מעשית: להתחיל לעבוד",
+      taste_test: "תוכנית טעימה: לבדוק את הכיוון",
+      research: "תוכנית חקר: ללמוד את הכיוון",
+    },
+    weekHeading: "שבוע {n}",
+    dayLabel: "יום {n}",
+    minutesLabel: "{n} דקות",
+    categoryLabels: {
+      action: "פעולה",
+      research: "מחקר",
+      network: "נטוורקינג",
+      reflection: "חשיבה",
+    },
+    generate: "צור תוכנית 30 יום",
+    generating: "יוצר תוכנית… (עד דקה)",
+    regenerate: "צור תוכנית חדשה",
+    regenerateConfirm: "התוכנית הקיימת תוחלף בחדשה. להמשיך?",
+    emptyState: {
+      title: "אין עוד תוכנית",
+      body: "כדי לקבל תוכנית 30 יום, קבל קודם המלצות.",
+      cta: "עבור להמלצות",
+    },
+    error: {
+      generic: "לא הצלחנו ליצור תוכנית כרגע. נסה שוב בעוד רגע.",
+      noRecommendation: "אין המלצות. עבור קודם להמלצות.",
+    },
+    completed: "הושלם",
+  },
 } as const;
 
 export type HebrewStrings = typeof he;
