@@ -1,0 +1,37 @@
+{
+  "id": "product-manager",
+  "title_he": "מנהל/ת מוצר",
+  "title_en": "Product Manager",
+  "description_he": "אחריות על מוצר דיגיטלי מקצה לקצה — מה בונים, למי, ולמה. עבודה צמודה עם מפתחים, מעצבים, ושיווק כדי לתעדף, לתכנן, ולהשיק. תפקיד שמשלב חשיבה אסטרטגית, הקשבה ללקוח, וניתוח נתונים, ודורש יכולת לקבל החלטות גם בתנאי אי-ודאות.",
+  "riasec_affinity": { "R": 0.20, "I": 0.65, "A": 0.40, "S": 0.65, "E": 0.80, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "product-management", "importance": 1.0 },
+    { "skill_id": "communication", "importance": 0.85 },
+    { "skill_id": "data-analysis", "importance": 0.75 },
+    { "skill_id": "ux-design", "importance": 0.6 },
+    { "skill_id": "english-business", "importance": 0.8 },
+    { "skill_id": "presentation", "importance": 0.6 }
+  ],
+  "desired_skills": [
+    { "skill_id": "project-management", "importance": 0.55 },
+    { "skill_id": "sql", "importance": 0.4 },
+    { "skill_id": "team-leadership", "importance": 0.5 }
+  ],
+  "values_fit": ["impact", "challenge", "money", "learning", "variety"],
+  "big5_fit": { "E": 65, "O": 70, "C": 65 },
+  "constraints": {
+    "typical_training_months": 6,
+    "typical_training_cost_nis": 25000,
+    "requires_english_level": "advanced",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 22000,
+    "typical_salary_nis_max": 50000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

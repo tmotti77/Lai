@@ -1,0 +1,36 @@
+{
+  "id": "electrician",
+  "title_he": "חשמלאי/ת מוסמך/ת",
+  "title_en": "Licensed Electrician",
+  "description_he": "התקנה, תחזוקה ותיקון של מערכות חשמל בבתים, מבנים מסחריים, ואתרי בנייה. עבודה עצמאית או כשכיר/ה, כולל היכרות עם תקנות הבטיחות ורישוי משרד התשתיות. תפקיד פיזי שמשלב כישורים טכניים, אחריות גבוהה, וגמישות בעבודה. ביקוש יציב לאורך זמן.",
+  "riasec_affinity": { "R": 0.95, "I": 0.45, "A": 0.10, "S": 0.30, "E": 0.30, "C": 0.65 },
+  "required_skills": [
+    { "skill_id": "electrical-systems", "importance": 1.0 },
+    { "skill_id": "tool-use", "importance": 0.9 },
+    { "skill_id": "safety", "importance": 0.95 },
+    { "skill_id": "manual-dexterity", "importance": 0.85 },
+    { "skill_id": "attention-to-detail", "importance": 0.75 }
+  ],
+  "desired_skills": [
+    { "skill_id": "physical-stamina", "importance": 0.55 },
+    { "skill_id": "self-direction", "importance": 0.55 },
+    { "skill_id": "communication", "importance": 0.4 }
+  ],
+  "values_fit": ["money", "stability", "freedom", "variety"],
+  "big5_fit": { "C": 70 },
+  "constraints": {
+    "typical_training_months": 12,
+    "typical_training_cost_nis": 12000,
+    "requires_english_level": "none",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה", "צפון", "דרום", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 12000,
+    "typical_salary_nis_max": 25000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

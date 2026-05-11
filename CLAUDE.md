@@ -33,8 +33,10 @@ Earlier sketches considered Next.js + Python FastAPI + OpenAI + Vercel/Render/Ne
 ## Plans
 
 - `docs/superpowers/plans/2026-05-10-career-os-00-master-roadmap.md` — 7-phase roadmap, decisions, KPIs, risks
-- `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 bite-sized tasks (current)
-- Phases 2–7: write each plan when its phase begins (don't pre-write speculatively)
+- `docs/superpowers/plans/2026-05-10-career-os-01-foundation.md` — Phase 1 (foundation, merged)
+- `docs/superpowers/plans/2026-05-10-career-os-02-conversation-engine.md` — Phase 2 (chat engine + safety, merged)
+- `docs/superpowers/plans/2026-05-10-career-os-03a-formal-assessments.md` — Phase 3a (formal assessments, current)
+- Phases 3b–7: write each plan when its phase begins (don't pre-write speculatively). Phase 3 was split into 3a (formal assessments) and 3b (CV upload + skill extraction).
 
 ## Phase 2 architecture (engine core + safety)
 
@@ -52,6 +54,64 @@ The chat is now stage-aware with a 6-stage state machine: `onboarding → intere
 - **Cache observability**: every assistant turn logs `inputTokens`, `outputTokens`, `cacheRead`, `cacheWrite` to the server console + persists `cache_read_tokens` / `cache_write_tokens` columns. Use these to diagnose caching behavior.
 
 **Architectural rule, do not bypass**: `checkUserMessage` MUST run on every user turn before any `streamText` call. If you're touching `app/api/chat/route.ts`, the safety pre-check is the first thing the route does after parsing the body. This is a *legal* protection, not just a quality one.
+
+## Phase 3a architecture (formal assessments)
+
+Four formal assessment surfaces live under `/assessment`: RIASEC (30 items), Big5 (20 items, IPIP-NEO short form with reverse-keyed acquiescence control), values picker (pick 5 of 12 + rank 3), and a constraints form. The hub at `/assessment` shows per-type completion status; each assessment has its own deep-link page at `/assessment/{riasec,big5,values,constraints}`.
+
+- **Items live in code** (`lib/assessment/<type>/items.ts`), not DB. Each items file exports an `_ITEMS_VERSION` integer; every persisted submission stores its `items_version`. If items get reworded, historical scores remain interpretable against the version that was active at submission time.
+- **Scoring is pure deterministic TypeScript** in `lib/assessment/<type>/score.ts` — same architectural rule as the matching engine. RIASEC: per-type sum normalized 0..100 + Holland code (top 3 letters, ties broken by `RIASEC_TYPES` declaration order: R, I, A, S, E, C). Big5: reverse-key inversion (`6 - raw` for items flagged `reverseKeyed`), then per-trait normalize. Values: `validateValuesSubmission` enforces picked.length===5, ranked.length===3, ranked⊆picked, no duplicates. Constraints: zod schema with field bounds (`time_per_week_hours: 0..60`, `training_budget_nis: 0..200_000`, etc.).
+- **`assessments` table**: one row per submission (history-preserving). Latest-per-type retrieved via `ORDER BY taken_at DESC` then dedupe-in-memory. `getProfile()` in `lib/db/profile.ts` JOINs the latest row per type into a `formal` key on the returned profile.
+- **DB layer creates its own service-role client.** `lib/db/assessments.ts` calls `createServiceClient()` internally — same pattern as `lib/db/queries.ts` from Phase 2. Routes pass only the resolved `userId`, not a Supabase client. **The RLS policy only matches `auth.uid()`; the cookie-based anon-key client cannot insert assessments for anonymous users.** This is a real constraint — if you write a new caller, use the service-role pattern.
+- **Submit endpoint**: one unified `POST /api/assessment/submit` with a zod `discriminatedUnion("type", [...])`. Per-type completeness pre-check (riasec/big5 must have all expected item ids) runs **before** opening a DB connection — bad client requests fail-fast with 400.
+- **Items v1 quality flag**: the Hebrew items in `lib/assessment/<type>/items.ts` are best-effort and need a Hebrew-speaking psychologist's review before public launch. Tracked as a Phase 7 launch-checklist item, not a blocker for Phase 4 matching engine work.
+
+## Phase 4 architecture (occupations DB + matching engine)
+
+The matching engine is the IP. It takes a user's profile (chat-extracted from Phase 2 + formal assessments from Phase 3a) and produces a deterministic ranked list of occupations + a 3-paths recommendation (safe / growth / wildcard) + Hebrew prose explanations. Surface: `/recommendations` page; engine: `lib/matching/engine.ts`.
+
+- **Two-layer architecture, never blurred**: scoring layer is pure TypeScript (`lib/matching/score/{interests,skills,values,big5,constraints,market}.ts`); prose layer is a single LLM call (`lib/ai/prompts/explanations.ts`) that reads scores and writes Hebrew. **The LLM never produces a number.** Don't merge them.
+- **Weights**: 25/20/15/15/15/10 (interests / skills / values / big5 / constraints / market) — master roadmap §9. Sum = 100.
+- **Re-normalization for missing dimensions**: each dimension scorer returns `null` when the user has no signal for it. The combiner (`lib/matching/engine.ts`) drops null dimensions and re-normalizes the remaining weights so they still sum to 100. **Never default a missing dimension to 50** — that biases every match toward neutral. A chat-only user gets weights re-normalized over 4 dimensions; a fully-assessed user gets all 6.
+- **Catalog**: `content/occupations/*.json` (20 hand-curated v1, schema-validated by `scripts/validate-occupations.ts`) + `content/skills/taxonomy.json` (60 skills). Seeded into DB by `npm run seed:occupations` which also bumps `catalog_version`.
+- **Cache**: `recommendations` table keyed on `profile_hash = sha1({profile, catalogVersion})`. Profile change OR catalog change → new hash → recompute. Same hash + ≤7 days old → reuse, no LLM call.
+- **3-paths heuristic** (`lib/matching/paths.ts`): single-pass evaluation in declaration order (safe → growth → wildcard), no occupation reuses across paths. `safe` requires `constraints≥75 + training≤6mo + high demand`. `growth` requires `interests≥70 + 6-18mo training + medium-high demand`. `wildcard` requires `total_score≥60`. Slots that find no qualifying occupation return `null` and the UI shows "no clear N-path option" rather than forcing a bad fit.
+- **Skill matching is fuzzy**: chat-extracted skills are free-form Hebrew labels, not taxonomy ids. `lib/matching/score/skills.ts` matches via lowercase substring containment. Phase 3b (CV upload) will add LLM-based extraction-to-taxonomy.
+- **Catalog quality flag**: 20 occupations v1 are best-effort (`data_source: "public_knowledge_v1_2026-05"`). Need expert review before public launch — tracked in Phase 7. Phase 4.5 expands the catalog toward the master roadmap's target of 100.
+- **Prompt cache** in `explanations.ts`: uses the explicit `messages` array form with `providerOptions.anthropic.cacheControl` on the `role: "system"` message. **Don't use `system: "..."` shorthand on `generateObject`** — top-level `providerOptions` puts the breakpoint on the user message (which changes every call), making the cache write-only.
+
+## Phase 5a architecture (PDF report)
+
+The PDF report is the user-facing artifact. Triggered from `/recommendations` via the Download button → `GET /api/report/pdf` → reads the cached `recommendations` row + occupations + user's `career_profile`, renders a 3-page Hebrew RTL PDF via `@react-pdf/renderer`, streams as attachment.
+
+- **No new LLM call.** Reuses `recommendations.prose` from Phase 4. PDF render is pure-Node, ~500ms, $0.
+- **No `reports` table.** The PDF is a derivation of the cache, not persisted. Re-download = re-render from latest `recommendations` row.
+- **Font is `public/fonts/Heebo-VF.ttf`** — the variable-weight TTF from Google Fonts. Registered three times in `lib/pdf/fonts.ts` under different `fontWeight` values; fontkit picks the correct axis instance. Single file ships Hebrew + Latin so mixed-language text renders entirely in Heebo (no Helvetica fallback).
+- **RTL strategy**: `direction: "rtl"` at Page level in `lib/pdf/styles.ts` + `textAlign: "right"` on text. `scoreValue` uses `textAlign: "left"` deliberately — numeric values read LTR even on an RTL page. Logical margins (`marginEnd`, `marginStart`) work in @react-pdf v4+.
+- **Section components** under `lib/pdf/sections/`. Each takes only the data it needs (not the full `ReportData`), so they're independently understandable. Composed by `lib/pdf/ReportDocument.tsx` into 3 pages: cover → profile mirror + 3 paths → top-5 rankings + follow-ups. Disclaimer footer is `<Text fixed>` on every page.
+- **Disclaimer in 4 places now complete** (master roadmap §6 risk mitigation): chat header banner (Phase 1) + T&C page (Phase 1) + system prompt (Phase 2) + report cover and footer (Phase 5a). Phase 7 launch checklist gates on this.
+- **Spike-then-cleanup pattern** for risky tech: Task 1 ran an RTL spike with `npm run pdf:spike` to validate Hebrew rendering before building the full report. The spike artifacts (`scripts/pdf-spike.ts`, `lib/pdf/spike.tsx`) were deleted after verification. `spike.pdf` is gitignored in case anyone runs a future spike.
+- **Buffer-to-Response cast**: Node `Buffer` is not a Web `BodyInit`. The route casts `new Response(buffer as BodyInit, ...)` — necessary type workaround; runtime behavior is unchanged.
+
+## Phase 5b architecture (30-day plan)
+
+Turns a recommendation into a checkable 30-day action plan. Triggered from `/recommendations` via "צור תוכנית 30 יום" → `/plan` → "Generate" → `POST /api/plan/generate`. Each task is one row in `plan_tasks` so toggles are atomic single-row UPDATEs.
+
+- **Archetype selection is deterministic** (`lib/plan/selectArchetype.ts`): top-1 path slot drives the archetype. Safe → "apply", Growth → "taste_test", Wildcard → "research". The chosen archetype's path occupation is the target the LLM customizes tasks toward.
+- **One LLM call per plan** (`lib/plan/compose.ts`): zod 30-task schema (`day`, `title_he`, `description_he`, `category`, `estimated_minutes`). System prompt is prompt-cached (per the explanations.ts pattern). Profile + top-occupation + Hebrew prose feeds the user message.
+- **One row per task** (`plan_tasks` table): toggle is `UPDATE plan_tasks SET done = $1 WHERE id = $2`. JSONB array would force read-modify-write of all 30 items per toggle — race-prone, slow.
+- **Plans are per-recommendation_id**: regenerating recommendations means regenerating the plan. The route `DELETE`s any old plan for the same recommendation before inserting the new one — keeps "one plan per recommendation" invariant.
+- **Authorization**: anonymous-OK. Same pattern as Phase 4/5a. RLS policy is on `plans` rows; `plan_tasks` policy joins through `plans` to check ownership. Service-role client used in `lib/db/plans.ts`.
+- **UI grouping**: tasks render in 5 sections (week 1: days 1-7, ..., week 5: days 29-30). Each task row has a custom checkbox (a button with `role="checkbox"` and `aria-pressed`). Optimistic toggle UI with rollback on failure.
+
+## Phase 5c architecture (save report + auth upgrade)
+
+Adds the conversion surface: "שמור דוח" button on `/recommendations` opens a dialog with email magic-link sign-in or Google OAuth. **No new tables, no new auth provider** — reuses Phase 1's Supabase magic-link OTP + the existing `/auth/callback` route which already supports `?next=/recommendations`.
+
+- **Promotion happens automatically** in `lib/anonymous.ts` `getOrCreateAnonymousUserId`: when an `authedUserId` first appears, the existing anonymous `users` row is UPDATEd in place (`auth_id = $1, is_anonymous = false`), preserving every attached conversation / recommendation / plan / assessment. The `co_anon` cookie is deleted, `anonymous_sessions` row removed. **Master roadmap §22 conversion event lands here.**
+- **`SaveReportDialog`** is a thin wrapper around the Phase 1 sign-in pattern but in a Dialog. Same magic-link + Google buttons; redirects to `/auth/callback?next=/recommendations` so the user returns to where they left off, now signed in.
+- **Visibility logic**: anonymous → show "שמור דוח" button; signed-in → show "✓ שמור בחשבון שלך" badge. Toggle via `supabase.auth.onAuthStateChange` subscription so the UI updates immediately after the callback round-trip.
+- **No email-the-PDF feature** in this phase. The magic link IS the email — clicking it lands on `/recommendations` where the user can re-download. "Email me the PDF as attachment" is a Phase 5c.5 polish needing Resend integration.
 
 ## Project-specific conventions
 

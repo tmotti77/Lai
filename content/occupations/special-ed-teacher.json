@@ -1,0 +1,37 @@
+{
+  "id": "special-ed-teacher",
+  "title_he": "מורה לחינוך מיוחד",
+  "title_en": "Special Education Teacher",
+  "description_he": "הוראה וליווי של ילדים עם צרכים מיוחדים — לקויות למידה, אוטיזם, נכויות התפתחותיות. עבודה בכיתות קטנות או באחד-על-אחד, בניית תוכנית אישית לכל ילד, ועבודה הדוקה עם הורים ואנשי טיפול. תפקיד דורש סבלנות עצומה ומשמעות אדירה.",
+  "riasec_affinity": { "R": 0.25, "I": 0.45, "A": 0.55, "S": 0.95, "E": 0.30, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "teaching", "importance": 1.0 },
+    { "skill_id": "patience", "importance": 0.95 },
+    { "skill_id": "special-needs", "importance": 0.95 },
+    { "skill_id": "empathy", "importance": 0.9 },
+    { "skill_id": "communication", "importance": 0.8 },
+    { "skill_id": "child-development", "importance": 0.75 }
+  ],
+  "desired_skills": [
+    { "skill_id": "creativity", "importance": 0.55 },
+    { "skill_id": "stress-tolerance", "importance": 0.6 },
+    { "skill_id": "counseling", "importance": 0.5 }
+  ],
+  "values_fit": ["impact", "service", "team", "balance", "stability"],
+  "big5_fit": { "A": 80, "C": 65 },
+  "constraints": {
+    "typical_training_months": 36,
+    "typical_training_cost_nis": 35000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "צפון", "דרום", "ירושלים", "שרון", "חיפה", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 9500,
+    "typical_salary_nis_max": 15500,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

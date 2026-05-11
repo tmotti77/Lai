@@ -1,0 +1,36 @@
+{
+  "id": "qa-automation",
+  "title_he": "מהנדס/ת בדיקות תוכנה",
+  "title_en": "QA Automation Engineer",
+  "description_he": "כתיבת בדיקות אוטומטיות ובדיקות ידניות לוודא שהמוצר עובד כמתוכנן. בנייה ותחזוקה של תשתיות בדיקה, ניתוח באגים מול מפתחים, ואחריות לאיכות לפני כל גרסה. תפקיד שמשלב חשיבה אנליטית מסודרת עם תשומת לב גבוהה לפרטים.",
+  "riasec_affinity": { "R": 0.30, "I": 0.70, "A": 0.20, "S": 0.30, "E": 0.20, "C": 0.85 },
+  "required_skills": [
+    { "skill_id": "qa-testing", "importance": 1.0 },
+    { "skill_id": "test-automation", "importance": 0.85 },
+    { "skill_id": "javascript", "importance": 0.65 },
+    { "skill_id": "attention-to-detail", "importance": 0.9 },
+    { "skill_id": "english-business", "importance": 0.6 }
+  ],
+  "desired_skills": [
+    { "skill_id": "programming-general", "importance": 0.55 },
+    { "skill_id": "sql", "importance": 0.4 },
+    { "skill_id": "communication", "importance": 0.5 }
+  ],
+  "values_fit": ["stability", "learning", "team", "money"],
+  "big5_fit": { "C": 75, "O": 55 },
+  "constraints": {
+    "typical_training_months": 4,
+    "typical_training_cost_nis": 18000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 14000,
+    "typical_salary_nis_max": 30000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

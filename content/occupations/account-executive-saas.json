@@ -1,0 +1,38 @@
+{
+  "id": "account-executive-saas",
+  "title_he": "Account Executive (SaaS / B2B)",
+  "title_en": "Account Executive (SaaS / B2B)",
+  "description_he": "מכירת מוצר תוכנה לארגונים, רוב הזמן ללקוחות בארה\"ב או אירופה. הובלת תהליך מכירה מליד עד חתימה — שיחות תגלית, הדגמות, משא ומתן עם רוכשים, וסגירה מול אנשי כספים. תפקיד שמתגמל מאוד אנשים מוחצנים עם אנגלית טובה ועמידה בלחץ יעדים.",
+  "riasec_affinity": { "R": 0.10, "I": 0.40, "A": 0.30, "S": 0.75, "E": 0.95, "C": 0.45 },
+  "required_skills": [
+    { "skill_id": "saas-sales", "importance": 1.0 },
+    { "skill_id": "sales", "importance": 0.95 },
+    { "skill_id": "negotiation", "importance": 0.85 },
+    { "skill_id": "english-business", "importance": 0.95 },
+    { "skill_id": "communication", "importance": 0.9 },
+    { "skill_id": "presentation", "importance": 0.8 },
+    { "skill_id": "stress-tolerance", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "writing-en", "importance": 0.55 },
+    { "skill_id": "data-analysis", "importance": 0.4 },
+    { "skill_id": "self-direction", "importance": 0.6 }
+  ],
+  "values_fit": ["money", "challenge", "freedom", "status", "variety"],
+  "big5_fit": { "E": 85, "C": 60 },
+  "constraints": {
+    "typical_training_months": 3,
+    "typical_training_cost_nis": 5000,
+    "requires_english_level": "advanced",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה"]
+  },
+  "market": {
+    "demand_he": "very_high",
+    "typical_salary_nis_min": 18000,
+    "typical_salary_nis_max": 50000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

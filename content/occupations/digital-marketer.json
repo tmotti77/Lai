@@ -1,0 +1,37 @@
+{
+  "id": "digital-marketer",
+  "title_he": "משווק/ת דיגיטלי",
+  "title_en": "Digital Marketer",
+  "description_he": "ניהול קמפיינים בפייסבוק, גוגל, ובערוצים נוספים — כתיבת מודעות, אופטימיזציה לפי נתונים, וליווי משפך הלקוח מהקליק ועד הרכישה. תפקיד שמשלב יצירתיות עם מספרים, ופותח דלתות גם להתמחויות SEO, SEM, או Growth.",
+  "riasec_affinity": { "R": 0.15, "I": 0.50, "A": 0.70, "S": 0.45, "E": 0.75, "C": 0.65 },
+  "required_skills": [
+    { "skill_id": "marketing", "importance": 1.0 },
+    { "skill_id": "growth-marketing", "importance": 0.85 },
+    { "skill_id": "copywriting", "importance": 0.8 },
+    { "skill_id": "data-analysis", "importance": 0.7 },
+    { "skill_id": "writing-he", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "creativity", "importance": 0.6 },
+    { "skill_id": "spreadsheets", "importance": 0.5 },
+    { "skill_id": "english-business", "importance": 0.55 },
+    { "skill_id": "graphic-design", "importance": 0.4 }
+  ],
+  "values_fit": ["creativity", "variety", "money", "challenge", "freedom"],
+  "big5_fit": { "O": 70, "E": 60 },
+  "constraints": {
+    "typical_training_months": 6,
+    "typical_training_cost_nis": 12000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 10000,
+    "typical_salary_nis_max": 25000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

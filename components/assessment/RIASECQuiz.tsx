@@ -1,0 +1,66 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { RIASEC_ITEMS } from "@/lib/assessment/riasec/items";
+import { LikertRow } from "./LikertRow";
+import { ProgressIndicator } from "./ProgressIndicator";
+import { Button } from "@/components/ui/button";
+import { he } from "@/lib/i18n/he";
+import { toast } from "sonner";
+
+export function RIASECQuiz() {
+  const router = useRouter();
+  const [responses, setResponses] = useState<Record<string, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const total = RIASEC_ITEMS.length;
+  const answered = Object.keys(responses).length;
+  const allAnswered = answered === total;
+
+  const onSubmit = async () => {
+    if (!allAnswered) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/assessment/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "riasec", responses }),
+      });
+      if (!res.ok) {
+        toast.error(he.assessment.common.error);
+        setSubmitting(false);
+        return;
+      }
+      toast.success(he.assessment.common.submitted);
+      router.push("/assessment");
+    } catch {
+      toast.error(he.assessment.common.error);
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/80 px-4 py-3 backdrop-blur">
+        <ProgressIndicator current={answered} total={total} />
+      </div>
+      {RIASEC_ITEMS.map((item) => (
+        <LikertRow
+          key={item.id}
+          itemId={item.id}
+          text={item.text_he}
+          value={responses[item.id]}
+          onChange={(n) => setResponses((prev) => ({ ...prev, [item.id]: n }))}
+        />
+      ))}
+      <Button
+        type="button"
+        size="lg"
+        disabled={!allAnswered || submitting}
+        onClick={onSubmit}
+        className="self-stretch"
+      >
+        {submitting ? he.assessment.common.submitting : he.assessment.common.submit}
+      </Button>
+    </>
+  );
+}

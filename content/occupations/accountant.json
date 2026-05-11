@@ -1,0 +1,36 @@
+{
+  "id": "accountant",
+  "title_he": "רואה חשבון",
+  "title_en": "Certified Public Accountant",
+  "description_he": "ביקורת ספרים, דוחות כספיים, ייעוץ מס וליווי עסקים מול רשויות. עבודה במשרדי רו\"ח או כשכיר/ה במחלקת כספים בארגון. מקצוע מוסדר עם תואר, התמחות ומבחני מועצה. מתאים למי שאוהב/ת סדר, דיוק, ועבודה מול מספרים וחוק.",
+  "riasec_affinity": { "R": 0.20, "I": 0.55, "A": 0.10, "S": 0.30, "E": 0.45, "C": 0.95 },
+  "required_skills": [
+    { "skill_id": "accounting", "importance": 1.0 },
+    { "skill_id": "tax-knowledge", "importance": 0.9 },
+    { "skill_id": "spreadsheets", "importance": 0.85 },
+    { "skill_id": "attention-to-detail", "importance": 0.9 },
+    { "skill_id": "writing-he", "importance": 0.55 }
+  ],
+  "desired_skills": [
+    { "skill_id": "communication", "importance": 0.55 },
+    { "skill_id": "english-business", "importance": 0.5 },
+    { "skill_id": "data-analysis", "importance": 0.5 }
+  ],
+  "values_fit": ["stability", "money", "status", "learning"],
+  "big5_fit": { "C": 80 },
+  "constraints": {
+    "typical_training_months": 48,
+    "typical_training_cost_nis": 50000,
+    "requires_english_level": "basic",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 12000,
+    "typical_salary_nis_max": 30000,
+    "ai_risk": "high"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

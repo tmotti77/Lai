@@ -1,0 +1,37 @@
+{
+  "id": "chef",
+  "title_he": "שף",
+  "title_en": "Chef",
+  "description_he": "ניהול מטבח — תכנון תפריט, רכש חומרי גלם, הובלת צוות בישול, ושמירה על איכות וזמני הגשה. עבודה אינטנסיבית במשמרות ערב וסופי שבוע, עם לחץ גבוה אבל הרבה יצירתיות. מתאים למי שמתלהב/ת מאוכל ולא נשבר/ת תחת אש.",
+  "riasec_affinity": { "R": 0.65, "I": 0.30, "A": 0.80, "S": 0.40, "E": 0.65, "C": 0.45 },
+  "required_skills": [
+    { "skill_id": "cooking-technique", "importance": 1.0 },
+    { "skill_id": "menu-planning", "importance": 0.85 },
+    { "skill_id": "food-safety", "importance": 0.85 },
+    { "skill_id": "team-leadership", "importance": 0.75 },
+    { "skill_id": "stress-tolerance", "importance": 0.85 },
+    { "skill_id": "creativity", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "operations", "importance": 0.55 },
+    { "skill_id": "physical-stamina", "importance": 0.6 },
+    { "skill_id": "communication", "importance": 0.5 }
+  ],
+  "values_fit": ["creativity", "challenge", "team", "variety"],
+  "big5_fit": { "O": 65, "C": 60, "E": 55 },
+  "constraints": {
+    "typical_training_months": 24,
+    "typical_training_cost_nis": 20000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["תל אביב", "מרכז", "ירושלים", "חיפה", "שרון"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 9000,
+    "typical_salary_nis_max": 22000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

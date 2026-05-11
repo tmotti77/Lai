@@ -1,0 +1,37 @@
+{
+  "id": "social-worker",
+  "title_he": "עובד/ת סוציאלי/ת",
+  "title_en": "Social Worker",
+  "description_he": "ליווי אנשים ומשפחות במצבי מצוקה — נוער בסיכון, נפגעי אלימות, קשישים, אנשים בעוני. עבודה מול רשויות, כתיבת תסקירים, וניהול תיקי מקרה. תפקיד עם משמעות חברתית עמוקה שדורש חוסן רגשי גבוה ויכולת להציב גבולות. דרוש תואר ורישום בפנקס.",
+  "riasec_affinity": { "R": 0.20, "I": 0.55, "A": 0.40, "S": 0.95, "E": 0.40, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "social-work-methods", "importance": 1.0 },
+    { "skill_id": "counseling", "importance": 0.9 },
+    { "skill_id": "empathy", "importance": 0.9 },
+    { "skill_id": "communication", "importance": 0.85 },
+    { "skill_id": "stress-tolerance", "importance": 0.8 },
+    { "skill_id": "writing-he", "importance": 0.65 }
+  ],
+  "desired_skills": [
+    { "skill_id": "patience", "importance": 0.6 },
+    { "skill_id": "research-skills", "importance": 0.4 },
+    { "skill_id": "self-direction", "importance": 0.55 }
+  ],
+  "values_fit": ["impact", "service", "stability", "team"],
+  "big5_fit": { "A": 75, "C": 60 },
+  "constraints": {
+    "typical_training_months": 36,
+    "typical_training_cost_nis": 30000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "צפון", "דרום", "ירושלים", "שרון", "חיפה", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 9000,
+    "typical_salary_nis_max": 15000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "lab-technician",
+  "title_he": "טכנאי/ת מעבדה",
+  "title_en": "Laboratory Technician",
+  "description_he": "ביצוע בדיקות מעבדה במוסדות רפואה, ביוטכנולוגיה, או תעשייה — דגימות, ניתוחים, תיעוד תוצאות, ותחזוקת ציוד. עבודה לפי פרוטוקולים מדויקים בסביבה סטרילית. תפקיד למי שאוהב/ת תהליכים ברורים, שולחן עבודה מסודר, ועבודה עם מכשור.",
+  "riasec_affinity": { "R": 0.65, "I": 0.80, "A": 0.15, "S": 0.30, "E": 0.20, "C": 0.80 },
+  "required_skills": [
+    { "skill_id": "lab-technique", "importance": 1.0 },
+    { "skill_id": "lab-instrumentation", "importance": 0.9 },
+    { "skill_id": "anatomy", "importance": 0.65 },
+    { "skill_id": "attention-to-detail", "importance": 0.9 },
+    { "skill_id": "safety", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "research-skills", "importance": 0.5 },
+    { "skill_id": "english-business", "importance": 0.45 },
+    { "skill_id": "patience", "importance": 0.45 }
+  ],
+  "values_fit": ["stability", "service", "learning"],
+  "big5_fit": { "C": 75 },
+  "constraints": {
+    "typical_training_months": 24,
+    "typical_training_cost_nis": 20000,
+    "requires_english_level": "basic",
+    "remote_ok": false,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "ירושלים", "חיפה", "צפון", "דרום", "באר שבע"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 9000,
+    "typical_salary_nis_max": 15000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

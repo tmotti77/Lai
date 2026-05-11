@@ -1,0 +1,36 @@
+{
+  "id": "graphic-designer",
+  "title_he": "מעצב/ת גרפי/ת",
+  "title_en": "Graphic Designer",
+  "description_he": "עיצוב חזותי לתקשורת — לוגואים, חומרי שיווק, אריזות, ניוזלטרים, ופוסטים לרשתות. עבודה כפרילנס/ית או באולפן/סטודיו, רוב הזמן עם תוכנות Adobe או Figma. תפקיד למי שאוהב/ת אסתטיקה ויש לו/ה תיק עבודות לראות. תחרות גבוהה והשפעת AI גוברת.",
+  "riasec_affinity": { "R": 0.20, "I": 0.30, "A": 0.95, "S": 0.30, "E": 0.30, "C": 0.40 },
+  "required_skills": [
+    { "skill_id": "graphic-design", "importance": 1.0 },
+    { "skill_id": "creativity", "importance": 0.9 },
+    { "skill_id": "ui-design", "importance": 0.55 },
+    { "skill_id": "communication", "importance": 0.6 },
+    { "skill_id": "attention-to-detail", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "self-direction", "importance": 0.55 },
+    { "skill_id": "writing-he", "importance": 0.4 },
+    { "skill_id": "ux-design", "importance": 0.45 }
+  ],
+  "values_fit": ["creativity", "freedom", "variety", "balance"],
+  "big5_fit": { "O": 80, "A": 55 },
+  "constraints": {
+    "typical_training_months": 12,
+    "typical_training_cost_nis": 25000,
+    "requires_english_level": "basic",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון", "חיפה", "ירושלים"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 9000,
+    "typical_salary_nis_max": 18000,
+    "ai_risk": "high"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-10"
+}

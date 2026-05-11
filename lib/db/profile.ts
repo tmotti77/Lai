@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Stage } from "@/lib/ai/stages";
+import { getLatestByType } from "./assessments";
 
 export async function updateConversationStage(
   conversationId: string,
@@ -38,5 +39,6 @@ export async function getProfile(userId: string, conversationId: string) {
     .eq("user_id", userId)
     .eq("conversation_id", conversationId)
     .maybeSingle();
-  return data;
+  const formal = await getLatestByType(userId);
+  return data ? { ...data, formal } : { formal };
 }

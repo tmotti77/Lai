@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Occupation",
+  "type": "object",
+  "required": [
+    "id", "title_he", "title_en", "description_he",
+    "riasec_affinity", "required_skills", "desired_skills",
+    "values_fit", "constraints", "market",
+    "data_source", "last_verified_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "title_he": { "type": "string", "minLength": 2, "maxLength": 80 },
+    "title_en": { "type": "string", "minLength": 2, "maxLength": 80 },
+    "description_he": { "type": "string", "minLength": 30, "maxLength": 600 },
+    "riasec_affinity": {
+      "type": "object",
+      "required": ["R","I","A","S","E","C"],
+      "additionalProperties": false,
+      "properties": {
+        "R": { "type": "number", "minimum": 0, "maximum": 1 },
+        "I": { "type": "number", "minimum": 0, "maximum": 1 },
+        "A": { "type": "number", "minimum": 0, "maximum": 1 },
+        "S": { "type": "number", "minimum": 0, "maximum": 1 },
+        "E": { "type": "number", "minimum": 0, "maximum": 1 },
+        "C": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "required_skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill_id", "importance"],
+        "additionalProperties": false,
+        "properties": {
+          "skill_id": { "type": "string" },
+          "importance": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "desired_skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill_id", "importance"],
+        "additionalProperties": false,
+        "properties": {
+          "skill_id": { "type": "string" },
+          "importance": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "values_fit": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "big5_fit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "O": { "type": "number", "minimum": 0, "maximum": 100 },
+        "C": { "type": "number", "minimum": 0, "maximum": 100 },
+        "E": { "type": "number", "minimum": 0, "maximum": 100 },
+        "A": { "type": "number", "minimum": 0, "maximum": 100 },
+        "N": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": [
+        "typical_training_months",
+        "typical_training_cost_nis",
+        "requires_english_level",
+        "remote_ok",
+        "typical_locations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "typical_training_months": { "type": "integer", "minimum": 0, "maximum": 84 },
+        "typical_training_cost_nis": { "type": "integer", "minimum": 0, "maximum": 500000 },
+        "requires_english_level": { "type": "string", "enum": ["none","basic","intermediate","advanced","fluent"] },
+        "remote_ok": { "type": "boolean" },
+        "typical_locations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "market": {
+      "type": "object",
+      "required": ["demand_he", "typical_salary_nis_min", "typical_salary_nis_max", "ai_risk"],
+      "additionalProperties": false,
+      "properties": {
+        "demand_he": { "type": "string", "enum": ["low","medium","high","very_high"] },
+        "typical_salary_nis_min": { "type": "integer", "minimum": 0 },
+        "typical_salary_nis_max": { "type": "integer", "minimum": 0 },
+        "ai_risk": { "type": "string", "enum": ["low","medium","high"] }
+      }
+    },
+    "data_source": { "type": "string", "minLength": 5 },
+    "last_verified_at": { "type": "string", "format": "date" }
+  }
+}
