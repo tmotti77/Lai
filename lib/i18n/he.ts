@@ -176,7 +176,6 @@ export const he = {
     cachedNote: "המלצות שמורות מ-{when}. נרענן אם תוסיף לפרופיל שלך.",
     regenerate: "צור מחדש",
     downloadPdf: "הורד דוח PDF",
-    downloadingPdf: "מכין PDF…",
     noPathOption: "אין אפשרות מובהקת במסלול הזה לפי הפרופיל הנוכחי שלך.",
   },
   report: {
@@ -191,6 +190,19 @@ export const he = {
         valuesLabel: "ערכים מרכזיים",
         skillsLabel: "כישורים שזיהינו",
         constraintsLabel: "אילוצים מעשיים",
+        riasecNames: {
+          R: "מעשי-טכני",
+          I: "חוקר",
+          A: "אומנותי",
+          S: "חברתי",
+          E: "יזמי",
+          C: "מסודר",
+        },
+        constraintsFragments: {
+          hoursPerWeek: "{hours} שעות בשבוע",
+          trainingBudget: "תקציב הכשרה {amount} ש\"ח",
+          english: "אנגלית {level}",
+        },
       },
       threePaths: {
         title: "שלושה מסלולים לבחירה",

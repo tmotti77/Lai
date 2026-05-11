@@ -67,22 +67,26 @@ export function ProfileMirror({
   );
 }
 
-const RIASEC_NAMES_HE: Record<string, string> = {
-  R: "מעשי-טכני", I: "חוקר", A: "אומנותי", S: "חברתי", E: "יזמי", C: "מסודר",
-};
-
 function topRiasecLabel(interests: NonNullable<MatchingProfile["interests"]>): string {
+  const names = labels.riasecNames;
   const entries: [string, number][] = (Object.keys(interests) as (keyof typeof interests)[])
     .map((k) => [k as string, interests[k] as number]);
   const top = entries.sort((a, b) => b[1] - a[1]).slice(0, 3);
-  return top.map(([k]) => RIASEC_NAMES_HE[k] ?? k).join(" · ");
+  return top.map(([k]) => names[k as keyof typeof names] ?? k).join(" · ");
 }
 
 function constraintsSummary(c: NonNullable<MatchingProfile["constraints"]>): string {
+  const f = labels.constraintsFragments;
   const parts: string[] = [];
   if (c.location_he) parts.push(c.location_he);
-  if (c.time_per_week_hours !== undefined) parts.push(`${c.time_per_week_hours} שעות בשבוע`);
-  if (c.training_budget_nis !== undefined) parts.push(`תקציב הכשרה ${c.training_budget_nis.toLocaleString("he-IL")} ש"ח`);
-  if (c.english_level) parts.push(`אנגלית ${c.english_level}`);
+  if (c.time_per_week_hours !== undefined) {
+    parts.push(f.hoursPerWeek.replace("{hours}", String(c.time_per_week_hours)));
+  }
+  if (c.training_budget_nis !== undefined) {
+    parts.push(f.trainingBudget.replace("{amount}", c.training_budget_nis.toLocaleString("he-IL")));
+  }
+  if (c.english_level) {
+    parts.push(f.english.replace("{level}", c.english_level));
+  }
   return parts.join(" · ");
 }
