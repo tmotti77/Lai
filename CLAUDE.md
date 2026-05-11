@@ -80,6 +80,19 @@ The matching engine is the IP. It takes a user's profile (chat-extracted from Ph
 - **Catalog quality flag**: 20 occupations v1 are best-effort (`data_source: "public_knowledge_v1_2026-05"`). Need expert review before public launch — tracked in Phase 7. Phase 4.5 expands the catalog toward the master roadmap's target of 100.
 - **Prompt cache** in `explanations.ts`: uses the explicit `messages` array form with `providerOptions.anthropic.cacheControl` on the `role: "system"` message. **Don't use `system: "..."` shorthand on `generateObject`** — top-level `providerOptions` puts the breakpoint on the user message (which changes every call), making the cache write-only.
 
+## Phase 5a architecture (PDF report)
+
+The PDF report is the user-facing artifact. Triggered from `/recommendations` via the Download button → `GET /api/report/pdf` → reads the cached `recommendations` row + occupations + user's `career_profile`, renders a 3-page Hebrew RTL PDF via `@react-pdf/renderer`, streams as attachment.
+
+- **No new LLM call.** Reuses `recommendations.prose` from Phase 4. PDF render is pure-Node, ~500ms, $0.
+- **No `reports` table.** The PDF is a derivation of the cache, not persisted. Re-download = re-render from latest `recommendations` row.
+- **Font is `public/fonts/Heebo-VF.ttf`** — the variable-weight TTF from Google Fonts. Registered three times in `lib/pdf/fonts.ts` under different `fontWeight` values; fontkit picks the correct axis instance. Single file ships Hebrew + Latin so mixed-language text renders entirely in Heebo (no Helvetica fallback).
+- **RTL strategy**: `direction: "rtl"` at Page level in `lib/pdf/styles.ts` + `textAlign: "right"` on text. `scoreValue` uses `textAlign: "left"` deliberately — numeric values read LTR even on an RTL page. Logical margins (`marginEnd`, `marginStart`) work in @react-pdf v4+.
+- **Section components** under `lib/pdf/sections/`. Each takes only the data it needs (not the full `ReportData`), so they're independently understandable. Composed by `lib/pdf/ReportDocument.tsx` into 3 pages: cover → profile mirror + 3 paths → top-5 rankings + follow-ups. Disclaimer footer is `<Text fixed>` on every page.
+- **Disclaimer in 4 places now complete** (master roadmap §6 risk mitigation): chat header banner (Phase 1) + T&C page (Phase 1) + system prompt (Phase 2) + report cover and footer (Phase 5a). Phase 7 launch checklist gates on this.
+- **Spike-then-cleanup pattern** for risky tech: Task 1 ran an RTL spike with `npm run pdf:spike` to validate Hebrew rendering before building the full report. The spike artifacts (`scripts/pdf-spike.ts`, `lib/pdf/spike.tsx`) were deleted after verification. `spike.pdf` is gitignored in case anyone runs a future spike.
+- **Buffer-to-Response cast**: Node `Buffer` is not a Web `BodyInit`. The route casts `new Response(buffer as BodyInit, ...)` — necessary type workaround; runtime behavior is unchanged.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.
