@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -136,21 +134,9 @@ export type Database = {
         ]
       }
       catalog_version: {
-        Row: {
-          id: number
-          updated_at: string
-          version: number
-        }
-        Insert: {
-          id?: number
-          updated_at?: string
-          version?: number
-        }
-        Update: {
-          id?: number
-          updated_at?: string
-          version?: number
-        }
+        Row: { id: number; updated_at: string; version: number }
+        Insert: { id?: number; updated_at?: string; version?: number }
+        Update: { id?: number; updated_at?: string; version?: number }
         Relationships: []
       }
       consents: {
@@ -342,6 +328,92 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_tasks: {
+        Row: {
+          category: Database["public"]["Enums"]["plan_task_category"]
+          created_at: string
+          day: number
+          description_he: string
+          done: boolean
+          done_at: string | null
+          estimated_minutes: number
+          id: string
+          plan_id: string
+          title_he: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["plan_task_category"]
+          created_at?: string
+          day: number
+          description_he: string
+          done?: boolean
+          done_at?: string | null
+          estimated_minutes: number
+          id?: string
+          plan_id: string
+          title_he: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["plan_task_category"]
+          created_at?: string
+          day?: number
+          description_he?: string
+          done?: boolean
+          done_at?: string | null
+          estimated_minutes?: number
+          id?: string
+          plan_id?: string
+          title_he?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_tasks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          archetype: Database["public"]["Enums"]["plan_archetype"]
+          generated_at: string
+          id: string
+          recommendation_id: string
+          user_id: string
+        }
+        Insert: {
+          archetype: Database["public"]["Enums"]["plan_archetype"]
+          generated_at?: string
+          id?: string
+          recommendation_id: string
+          user_id: string
+        }
+        Update: {
+          archetype?: Database["public"]["Enums"]["plan_archetype"]
+          generated_at?: string
+          id?: string
+          recommendation_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recommendations: {
         Row: {
           generated_at: string
@@ -450,9 +522,7 @@ export type Database = {
         Relationships: []
       }
     }
-    Views: {
-      [_ in never]: never
-    }
+    Views: { [_ in never]: never }
     Functions: {
       increment_conversation_counters: {
         Args: {
@@ -474,15 +544,14 @@ export type Database = {
     }
     Enums: {
       assessment_type: "riasec" | "big5" | "values" | "constraints"
+      plan_archetype: "apply" | "taste_test" | "research"
+      plan_task_category: "action" | "research" | "network" | "reflection"
     }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    CompositeTypes: { [_ in never]: never }
   }
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
@@ -495,21 +564,15 @@ export type Tables<
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends { Row: infer R }
       ? R
       : never
     : never
@@ -523,18 +586,14 @@ export type TablesInsert<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends { Insert: infer I }
       ? I
       : never
     : never
@@ -548,18 +607,14 @@ export type TablesUpdate<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends { Update: infer U }
       ? U
       : never
     : never
@@ -573,9 +628,7 @@ export type Enums<
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
@@ -590,9 +643,7 @@ export type CompositeTypes<
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
@@ -602,6 +653,8 @@ export const Constants = {
   public: {
     Enums: {
       assessment_type: ["riasec", "big5", "values", "constraints"],
+      plan_archetype: ["apply", "taste_test", "research"],
+      plan_task_category: ["action", "research", "network", "reflection"],
     },
   },
 } as const
