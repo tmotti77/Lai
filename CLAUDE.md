@@ -104,6 +104,15 @@ Turns a recommendation into a checkable 30-day action plan. Triggered from `/rec
 - **Authorization**: anonymous-OK. Same pattern as Phase 4/5a. RLS policy is on `plans` rows; `plan_tasks` policy joins through `plans` to check ownership. Service-role client used in `lib/db/plans.ts`.
 - **UI grouping**: tasks render in 5 sections (week 1: days 1-7, ..., week 5: days 29-30). Each task row has a custom checkbox (a button with `role="checkbox"` and `aria-pressed`). Optimistic toggle UI with rollback on failure.
 
+## Phase 5c architecture (save report + auth upgrade)
+
+Adds the conversion surface: "שמור דוח" button on `/recommendations` opens a dialog with email magic-link sign-in or Google OAuth. **No new tables, no new auth provider** — reuses Phase 1's Supabase magic-link OTP + the existing `/auth/callback` route which already supports `?next=/recommendations`.
+
+- **Promotion happens automatically** in `lib/anonymous.ts` `getOrCreateAnonymousUserId`: when an `authedUserId` first appears, the existing anonymous `users` row is UPDATEd in place (`auth_id = $1, is_anonymous = false`), preserving every attached conversation / recommendation / plan / assessment. The `co_anon` cookie is deleted, `anonymous_sessions` row removed. **Master roadmap §22 conversion event lands here.**
+- **`SaveReportDialog`** is a thin wrapper around the Phase 1 sign-in pattern but in a Dialog. Same magic-link + Google buttons; redirects to `/auth/callback?next=/recommendations` so the user returns to where they left off, now signed in.
+- **Visibility logic**: anonymous → show "שמור דוח" button; signed-in → show "✓ שמור בחשבון שלך" badge. Toggle via `supabase.auth.onAuthStateChange` subscription so the UI updates immediately after the callback round-trip.
+- **No email-the-PDF feature** in this phase. The magic link IS the email — clicking it lands on `/recommendations` where the user can re-download. "Email me the PDF as attachment" is a Phase 5c.5 polish needing Resend integration.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.

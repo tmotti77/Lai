@@ -177,6 +177,22 @@ export const he = {
     regenerate: "צור מחדש",
     downloadPdf: "הורד דוח PDF",
     noPathOption: "אין אפשרות מובהקת במסלול הזה לפי הפרופיל הנוכחי שלך.",
+    saveReport: {
+      cta: "שמור דוח",
+      alreadySaved: "שמור בחשבון שלך",
+      dialog: {
+        title: "שמור את הדוח שלך",
+        body: "תזין מייל ותקבל קישור התחברות. כל ההמלצות והתוכנית שלך יישמרו אצלך לחזור אליהן בעוד חצי שנה.",
+        emailLabel: "אימייל",
+        sendMagicLink: "שלח קישור התחברות",
+        sending: "שולח…",
+        sent: "שלחנו לך מייל עם קישור. בדוק את תיבת הדואר.",
+        googleSignIn: "המשך עם Google",
+        or: "או",
+        invalidEmail: "אימייל לא תקין",
+        cancel: "ביטול",
+      },
+    },
   },
   report: {
     title: "דוח קריירה אישי",

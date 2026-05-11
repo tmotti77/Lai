@@ -4,7 +4,9 @@ import Link from "next/link";
 import { he } from "@/lib/i18n/he";
 import { ThreePathsView } from "./ThreePathsView";
 import { EmptyProfileState } from "./EmptyProfileState";
+import { SaveReportDialog } from "./SaveReportDialog";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 import type { Ranking, Occupation, Paths } from "@/lib/matching/types";
 
 type ApiResponse = {
@@ -20,6 +22,17 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setIsSignedIn(!!data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsSignedIn(!!session?.user);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   const fetchRecs = async (force = false) => {
     setLoading(true);
@@ -70,8 +83,22 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
       )}
       {data.rankings.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm">
-          <div className="text-muted-foreground">{he.report.title}</div>
-          <div className="flex gap-2">
+          <div className="text-muted-foreground">
+            {isSignedIn ? (
+              <span className="inline-flex items-center gap-1">
+                <span aria-hidden>✓</span>
+                {he.recommendations.saveReport.alreadySaved}
+              </span>
+            ) : (
+              he.report.title
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!isSignedIn && (
+              <Button size="sm" onClick={() => setSaveDialogOpen(true)}>
+                {he.recommendations.saveReport.cta}
+              </Button>
+            )}
             <Button asChild size="sm" variant="outline">
               <Link href="/plan">{he.plan.generate}</Link>
             </Button>
@@ -81,6 +108,7 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
           </div>
         </div>
       )}
+      <SaveReportDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen} />
       <ThreePathsView
         rankings={data.rankings}
         paths={data.paths}
