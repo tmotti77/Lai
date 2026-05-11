@@ -45,6 +45,19 @@ export function AssessmentHub({ status }: { status: AssessmentStatusMap }) {
           );
         })}
       </ul>
+
+      <Link
+        href="/cv"
+        className="mt-4 flex items-center justify-between rounded-lg border-2 border-dashed bg-card p-4 transition-colors hover:border-primary/50 hover:bg-accent"
+      >
+        <div>
+          <div className="text-base font-medium">{he.cv.nav}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{he.cv.hero.subtitle}</div>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden>
+          <path d="M19 12H5m0 0l6 6m-6-6l6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </Link>
     </div>
   );
 }
