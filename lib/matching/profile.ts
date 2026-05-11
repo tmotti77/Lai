@@ -1,10 +1,21 @@
 import "server-only";
 import type { MatchingProfile, RiasecVector, Big5Vector } from "./types";
 
+type RawSkill = {
+  // Phase 2 chat-extraction shape
+  label_he?: string;
+  confidence?: string;
+  // Phase 3b CV-confirmation shape
+  id?: string;
+  name_he?: string;
+  source?: "cv" | "chat" | "manual";
+  evidence?: string;
+};
+
 type RawProfile = {
   data?: {
     interests?: { label_he: string; confidence?: string }[];
-    skills?: { label_he: string; confidence?: string }[];
+    skills?: RawSkill[];
     values?: string[];
     constraints?: Record<string, unknown>;
     summary_he?: string;
@@ -61,10 +72,30 @@ export function buildMatchingProfile(raw: RawProfile): MatchingProfile {
   }
 
   if (raw?.data?.skills && raw.data.skills.length > 0) {
-    profile.skills = raw.data.skills.map((s) => ({
-      id: s.label_he,
-      level: CONFIDENCE_TO_LEVEL[s.confidence ?? "medium"] ?? 0.6,
-    }));
+    // Support both shapes:
+    //  - Phase 2 chat: {label_he, confidence}  — only free-form Hebrew label
+    //  - Phase 3b CV:  {id, name_he, source, evidence} — has taxonomy id
+    //
+    // For CV-confirmed skills with a real taxonomy id (not "other:..."), pass
+    // s.id directly — it matches occupations' skill_id field exactly. The
+    // substring scorer was only ever a workaround for the chat-extraction era
+    // where ids didn't exist. Hebrew-only labels (e.g., "ניתוח נתונים") do NOT
+    // substring-match English skill_ids ("data-analysis") either direction —
+    // hence the need for precise id-based matching when available.
+    profile.skills = raw.data.skills
+      .map((s) => {
+        const hasTaxonomyId = !!s.id && !s.id.startsWith("other:");
+        const label = hasTaxonomyId
+          ? (s.id as string)
+          : (s.name_he ?? s.label_he ?? "");
+        const level =
+          s.source === "cv"
+            ? 1.0
+            : (CONFIDENCE_TO_LEVEL[s.confidence ?? "medium"] ?? 0.6);
+        return { id: label, level };
+      })
+      .filter((s) => s.id.length > 0);
+    if (profile.skills.length === 0) profile.skills = null;
   }
 
   return profile;
