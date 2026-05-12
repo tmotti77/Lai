@@ -180,8 +180,8 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
         skills={reviewData.skills}
         otherSkills={reviewData.otherSkills}
         saving={phase === "saving"}
-        onSave={handleConfirm}
-        onCancel={handleReUpload}
+        onSaveAction={handleConfirm}
+        onCancelAction={handleReUpload}
       />
     );
   }

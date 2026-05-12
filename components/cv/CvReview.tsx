@@ -49,15 +49,15 @@ export function CvReview({
   skills,
   otherSkills,
   saving,
-  onSave,
-  onCancel,
+  onSaveAction,
+  onCancelAction,
 }: {
   reflectionHe: string;
   skills: ExtractedSkill[];
   otherSkills: string[];
   saving: boolean;
-  onSave: (skillIds: string[]) => void;
-  onCancel: () => void;
+  onSaveAction: (skillIds: string[]) => void;
+  onCancelAction: () => void;
 }) {
   // Normalize all skills (taxonomy + other) into one ReviewSkill list.
   const initialList = useMemo<ReviewSkill[]>(() => {
@@ -316,10 +316,10 @@ export function CvReview({
                 .replace("{total}", String(allSkills.length))}
             </span>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={onCancel} disabled={saving}>
+              <Button variant="ghost" onClick={onCancelAction} disabled={saving}>
                 {he.cv.review.cancel}
               </Button>
-              <Button onClick={() => onSave(confirmed.map((s) => s.id))} disabled={saving || confirmed.length === 0}>
+              <Button onClick={() => onSaveAction(confirmed.map((s) => s.id))} disabled={saving || confirmed.length === 0}>
                 {saving ? he.cv.review.saving : he.cv.review.save}
               </Button>
             </div>
