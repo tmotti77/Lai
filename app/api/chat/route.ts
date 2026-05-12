@@ -61,11 +61,9 @@ export async function POST(req: Request) {
         content: he.safety.distressFallback,
         safetyFlag: safety.flag,
       });
-      console.warn("[chat] safety short-circuit", {
-        conversationId: conversation.id,
-        flag: safety.flag,
-        reason: safety.reason,
-      });
+      console.warn(
+        `[chat] safety short-circuit conv=${conversation.id} flag=${safety.flag} reason=${safety.reason}`,
+      );
 
       // Manual SSE response — bypass streamText entirely.
       const text = he.safety.distressFallback;
@@ -114,12 +112,9 @@ export async function POST(req: Request) {
     onAdvance: async (nextStage, reason) => {
       advancedToStage = nextStage;
       await updateConversationStage(conversation.id, nextStage);
-      console.log("[chat] stage advanced", {
-        conversationId: conversation.id,
-        from: currentStage,
-        to: nextStage,
-        reason,
-      });
+      console.log(
+        `[chat] stage advanced conv=${conversation.id} from=${currentStage} to=${nextStage} reason=${reason}`,
+      );
     },
   });
 
@@ -147,18 +142,14 @@ export async function POST(req: Request) {
     // the tool call with no follow-up text.
     stopWhen: stepCountIs(2),
     experimental_onToolCallStart: async ({ toolCall }) => {
-      console.log("[chat] tool call start", {
-        conversationId: conversation.id,
-        toolName: toolCall.toolName,
-        stage: currentStage,
-      });
+      console.log(
+        `[chat] tool call start conv=${conversation.id} tool=${toolCall.toolName} stage=${currentStage}`,
+      );
     },
     experimental_onToolCallFinish: async ({ toolCall }) => {
-      console.log("[chat] tool call finish", {
-        conversationId: conversation.id,
-        toolName: toolCall.toolName,
-        stage: currentStage,
-      });
+      console.log(
+        `[chat] tool call finish conv=${conversation.id} tool=${toolCall.toolName} stage=${currentStage}`,
+      );
     },
     onFinish: async ({ text, usage, providerMetadata }) => {
       const cache = extractAnthropicCacheUsage(usage, providerMetadata);
@@ -191,23 +182,20 @@ export async function POST(req: Request) {
           stage: stageJustCompleted,
         })
           .then(() =>
-            console.log("[chat] extraction done", {
-              conversationId: conversation.id,
-              stage: stageJustCompleted,
-            }),
+            console.log(
+              `[chat] extraction done conv=${conversation.id} stage=${stageJustCompleted}`,
+            ),
           )
           .catch((err) =>
-            console.error("[chat] extraction failed", {
-              conversationId: conversation.id,
-              stage: stageJustCompleted,
-              error: err instanceof Error ? err.message : String(err),
-            }),
+            console.error(
+              `[chat] extraction failed conv=${conversation.id} stage=${stageJustCompleted} error=${err instanceof Error ? err.message : String(err)}`,
+            ),
           );
       }
     },
     onError: async ({ error }) => {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[chat] streamText error", { conversationId: conversation.id, error: message });
+      console.error(`[chat] streamText error conv=${conversation.id} error=${message}`);
       await appendMessage({
         conversationId: conversation.id,
         role: "system",

@@ -74,7 +74,32 @@ async function sendTurn(text: string, turnLabel: string): Promise<void> {
   console.log(`stream length: ${acc.length} chars`);
 }
 
+// Run mode: "cache" tests cache reads (2 turns), "stage" tests onboarding -> interests
+// stage advance with all three onboarding criteria supplied.
+const mode = (process.argv[2] ?? "cache") as "cache" | "stage";
+
 (async () => {
+  if (mode === "stage") {
+    console.log("Testing stage advance: onboarding -> interests.");
+    console.log("Supplying age + deliberation + time commitment — model should call set_stage.\n");
+
+    await sendTurn(
+      "שלום. אני בן 22, סיימתי שירות צבאי לפני חודש, ולא יודע מה לעשות הלאה.",
+      "TURN 1 (age + deliberation)",
+    );
+    await sleep(2000);
+    await sendTurn(
+      "יש לי בערך שנה לפני שאני צריך להתחיל לימודים — אפשר להשקיע את הזמן הזה בלימוד או התנסות.",
+      "TURN 2 (time commitment — all three criteria now met)",
+    );
+    await sleep(2000);
+    await sendTurn(
+      "כן, אני סקרן בעיקר לגבי מה אני באמת אוהב לעשות.",
+      "TURN 3 (engagement — by now stage should be 'interests')",
+    );
+    return;
+  }
+
   console.log("Turn 1 will populate the cache; turn 2 should hit it.");
   console.log("Watch the dev server console for [chat] turn finished log lines.\n");
 
