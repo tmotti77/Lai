@@ -48,6 +48,10 @@ export async function extractText(
 function normalizeWhitespace(text: string): string {
   return text
     .replace(/\r\n/g, "\n")
+    // pdf-parse v2 appends "-- N of M --" page delimiters; strip them so they
+    // (a) don't slip past empty_text detection when a PDF has no real content,
+    // (b) don't waste LLM tokens on noise.
+    .replace(/^--\s*\d+\s+of\s+\d+\s*--$/gm, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
