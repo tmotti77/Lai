@@ -15,7 +15,8 @@
   "desired_skills": [
     { "skill_id": "operations", "importance": 0.55 },
     { "skill_id": "physical-stamina", "importance": 0.6 },
-    { "skill_id": "communication", "importance": 0.5 }
+    { "skill_id": "communication", "importance": 0.5 },
+    { "skill_id": "time-management", "importance": 0.55 }
   ],
   "values_fit": ["creativity", "challenge", "team", "variety"],
   "big5_fit": { "O": 65, "C": 60, "E": 55 },

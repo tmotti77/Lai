@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": [
     { "id": "programming-general", "name_he": "תכנות כללי", "category": "technical", "related_ids": ["javascript", "python"] },
     { "id": "javascript", "name_he": "JavaScript / TypeScript", "category": "technical", "related_ids": ["programming-general", "react"] },
@@ -60,6 +60,11 @@
     { "id": "creativity", "name_he": "יצירתיות והפקת רעיונות", "category": "creative", "related_ids": [] },
     { "id": "attention-to-detail", "name_he": "תשומת לב לפרטים", "category": "soft", "related_ids": ["qa-testing"] },
     { "id": "self-direction", "name_he": "עצמאות ויוזמה", "category": "soft", "related_ids": [] },
-    { "id": "stress-tolerance", "name_he": "עמידות בלחץ", "category": "soft", "related_ids": [] }
+    { "id": "stress-tolerance", "name_he": "עמידות בלחץ", "category": "soft", "related_ids": [] },
+    { "id": "english-language", "name_he": "אנגלית (כללית)", "category": "language", "related_ids": ["english-business"] },
+    { "id": "arabic", "name_he": "ערבית", "category": "language", "related_ids": [] },
+    { "id": "time-management", "name_he": "ניהול זמן", "category": "soft", "related_ids": ["self-direction"] },
+    { "id": "problem-solving", "name_he": "פתרון בעיות", "category": "analytical", "related_ids": ["research-skills"] },
+    { "id": "curriculum-design", "name_he": "תכנון תוכניות לימוד", "category": "creative", "related_ids": ["teaching", "child-development"] }
   ]
 }

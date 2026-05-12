@@ -15,7 +15,8 @@
   "desired_skills": [
     { "skill_id": "communication", "importance": 0.55 },
     { "skill_id": "presentation", "importance": 0.5 },
-    { "skill_id": "attention-to-detail", "importance": 0.55 }
+    { "skill_id": "attention-to-detail", "importance": 0.55 },
+    { "skill_id": "problem-solving", "importance": 0.55 }
   ],
   "values_fit": ["learning", "challenge", "money", "stability"],
   "big5_fit": { "C": 75, "O": 65 },

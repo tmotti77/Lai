@@ -14,7 +14,9 @@
   "desired_skills": [
     { "skill_id": "research-skills", "importance": 0.5 },
     { "skill_id": "english-business", "importance": 0.45 },
-    { "skill_id": "patience", "importance": 0.45 }
+    { "skill_id": "patience", "importance": 0.45 },
+    { "skill_id": "english-language", "importance": 0.4 },
+    { "skill_id": "problem-solving", "importance": 0.45 }
   ],
   "values_fit": ["stability", "service", "learning"],
   "big5_fit": { "C": 75 },
