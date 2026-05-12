@@ -63,7 +63,7 @@ export function CvReview({
   const initialList = useMemo<ReviewSkill[]>(() => {
     const list: ReviewSkill[] = [];
     for (const s of skills) {
-      if (s.confidence < 0.5) continue;
+      if (s.confidence < 0.65) continue;
       if (s.id.startsWith("other:")) {
         const phrase = s.id.slice(6);
         list.push({
