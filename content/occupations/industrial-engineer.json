@@ -16,7 +16,8 @@
     { "skill_id": "operations", "importance": 0.6 },
     { "skill_id": "team-leadership", "importance": 0.5 },
     { "skill_id": "english-business", "importance": 0.5 },
-    { "skill_id": "sql", "importance": 0.4 }
+    { "skill_id": "sql", "importance": 0.4 },
+    { "skill_id": "time-management", "importance": 0.5 }
   ],
   "values_fit": ["stability", "money", "challenge", "variety", "learning"],
   "big5_fit": { "C": 75, "O": 60 },

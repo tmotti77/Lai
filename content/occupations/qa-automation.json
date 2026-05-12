@@ -14,7 +14,8 @@
   "desired_skills": [
     { "skill_id": "programming-general", "importance": 0.55 },
     { "skill_id": "sql", "importance": 0.4 },
-    { "skill_id": "communication", "importance": 0.5 }
+    { "skill_id": "communication", "importance": 0.5 },
+    { "skill_id": "problem-solving", "importance": 0.55 }
   ],
   "values_fit": ["stability", "learning", "team", "money"],
   "big5_fit": { "C": 75, "O": 55 },

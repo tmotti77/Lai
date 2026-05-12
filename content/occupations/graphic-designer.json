@@ -14,7 +14,8 @@
   "desired_skills": [
     { "skill_id": "self-direction", "importance": 0.55 },
     { "skill_id": "writing-he", "importance": 0.4 },
-    { "skill_id": "ux-design", "importance": 0.45 }
+    { "skill_id": "ux-design", "importance": 0.45 },
+    { "skill_id": "english-language", "importance": 0.4 }
   ],
   "values_fit": ["creativity", "freedom", "variety", "balance"],
   "big5_fit": { "O": 80, "A": 55 },

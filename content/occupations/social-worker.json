@@ -15,7 +15,8 @@
   "desired_skills": [
     { "skill_id": "patience", "importance": 0.6 },
     { "skill_id": "research-skills", "importance": 0.4 },
-    { "skill_id": "self-direction", "importance": 0.55 }
+    { "skill_id": "self-direction", "importance": 0.55 },
+    { "skill_id": "arabic", "importance": 0.3 }
   ],
   "values_fit": ["impact", "service", "stability", "team"],
   "big5_fit": { "A": 75, "C": 60 },

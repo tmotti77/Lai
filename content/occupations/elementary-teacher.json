@@ -14,7 +14,9 @@
   "desired_skills": [
     { "skill_id": "creativity", "importance": 0.6 },
     { "skill_id": "presentation", "importance": 0.5 },
-    { "skill_id": "stress-tolerance", "importance": 0.5 }
+    { "skill_id": "stress-tolerance", "importance": 0.5 },
+    { "skill_id": "arabic", "importance": 0.3 },
+    { "skill_id": "curriculum-design", "importance": 0.5 }
   ],
   "values_fit": ["impact", "service", "team", "balance", "stability"],
   "big5_fit": { "A": 70, "C": 65 },

@@ -14,7 +14,8 @@
   "desired_skills": [
     { "skill_id": "physical-stamina", "importance": 0.55 },
     { "skill_id": "self-direction", "importance": 0.55 },
-    { "skill_id": "communication", "importance": 0.4 }
+    { "skill_id": "communication", "importance": 0.4 },
+    { "skill_id": "problem-solving", "importance": 0.5 }
   ],
   "values_fit": ["money", "stability", "freedom", "variety"],
   "big5_fit": { "C": 70 },

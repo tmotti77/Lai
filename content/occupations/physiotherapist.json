@@ -15,7 +15,8 @@
   "desired_skills": [
     { "skill_id": "teaching", "importance": 0.55 },
     { "skill_id": "research-skills", "importance": 0.4 },
-    { "skill_id": "first-aid", "importance": 0.5 }
+    { "skill_id": "first-aid", "importance": 0.5 },
+    { "skill_id": "english-language", "importance": 0.4 }
   ],
   "values_fit": ["impact", "service", "stability", "balance"],
   "big5_fit": { "A": 70, "C": 65 },
