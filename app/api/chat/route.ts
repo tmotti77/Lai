@@ -132,14 +132,15 @@ export async function POST(req: Request) {
       content: m.content,
     }));
 
-  const messages: ModelMessage[] = [
-    getCachedSystemMessage(currentStage),
-    ...historyAsModelMessages,
-  ];
-
   const result = streamText({
     model: anthropic(MODEL_ID),
-    messages,
+    // Pass the system message via the dedicated `system` option, not inside
+    // `messages` — AI SDK v6 warns against system-in-messages as a prompt-
+    // injection vector. `SystemModelMessage` form preserves
+    // providerOptions.anthropic.cacheControl, so the ephemeral cache
+    // breakpoint still applies (verified empirically: cache_read >0 on turn 2).
+    system: getCachedSystemMessage(currentStage),
+    messages: historyAsModelMessages,
     tools: { set_stage: setStageTool },
     // Allow up to 2 steps so Claude can call set_stage AND optionally add a closing
     // text after the tool result. Default of 1 step would stop the stream right after
@@ -162,15 +163,12 @@ export async function POST(req: Request) {
     onFinish: async ({ text, usage, providerMetadata }) => {
       const cache = extractAnthropicCacheUsage(usage, providerMetadata);
 
-      console.log("[chat] turn finished", {
-        conversationId: conversation.id,
-        stage: currentStage,
-        advancedTo: advancedToStage ?? "(no advance)",
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        cacheRead: cache.cacheReadInputTokens ?? 0,
-        cacheWrite: cache.cacheCreationInputTokens ?? 0,
-      });
+      // Inline the structured fields into the message string. Next.js dev
+      // logger only captures the first console.log argument, so passing an
+      // object as the second arg produced empty "{}" in .next/dev/logs/.
+      console.log(
+        `[chat] turn finished conv=${conversation.id} stage=${currentStage} advancedTo=${advancedToStage ?? "(none)"} in=${usage.inputTokens ?? 0} out=${usage.outputTokens ?? 0} cacheRead=${cache.cacheReadInputTokens ?? 0} cacheWrite=${cache.cacheCreationInputTokens ?? 0}`,
+      );
 
       await appendMessage({
         conversationId: conversation.id,
