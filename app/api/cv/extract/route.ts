@@ -4,6 +4,7 @@ import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { getCvUploadForUser, setExtraction } from "@/lib/db/cv";
 import { buildSystemPrompt } from "@/lib/cv/prompt";
 import { streamCvExtraction } from "@/lib/cv/extract";
+import { canonicalizeExtractedSkills } from "@/lib/cv/canonicalize";
 import type { ExtractedSkill } from "@/lib/cv/types";
 
 export const runtime = "nodejs";
@@ -43,11 +44,13 @@ export async function POST(req: Request) {
   void (async () => {
     try {
       const finalOutput = await result.output;
-      const taxonomySkills: ExtractedSkill[] = finalOutput.skills.map((s) => ({
-        id: s.id,
-        confidence: s.confidence,
-        evidence: s.evidence,
-      }));
+      const taxonomySkills: ExtractedSkill[] = canonicalizeExtractedSkills(
+        finalOutput.skills.map((s) => ({
+          id: s.id,
+          confidence: s.confidence,
+          evidence: s.evidence,
+        })),
+      );
       await setExtraction({
         id: upload.id,
         extractedText: upload.extracted_text ?? "",
