@@ -22,18 +22,23 @@ describe("canonicalizeExtractedSkills", () => {
   });
 
   it("rewrites unknown taxonomy-shaped ids to other:<id>", () => {
-    // Regression for the curriculum-design hallucination observed in E2E
-    // testing with the teacher fixture before the taxonomy entry was added.
-    const input = [mk("curriculum-design"), mk("foo-bar-baz")];
+    // Use deliberately-fictional ids that must NEVER be added to the taxonomy.
+    // The original regression test used "curriculum-design" — which then
+    // landed in the taxonomy via a parallel PR, inverting this assertion.
+    // The "-test-fake" suffix telegraphs "do not add me" to future maintainers.
+    const input = [mk("nonexistent-test-fake-skill"), mk("foo-bar-baz-test-fake")];
     const result = canonicalizeExtractedSkills(input);
-    expect(result.map((s) => s.id)).toEqual(["other:curriculum-design", "other:foo-bar-baz"]);
+    expect(result.map((s) => s.id)).toEqual([
+      "other:nonexistent-test-fake-skill",
+      "other:foo-bar-baz-test-fake",
+    ]);
   });
 
   it("preserves confidence and evidence when rewriting", () => {
-    const input = [mk("invented-id", 0.92, "exact CV phrase")];
+    const input = [mk("invented-id-test-fake", 0.92, "exact CV phrase")];
     const result = canonicalizeExtractedSkills(input);
     expect(result[0]).toEqual({
-      id: "other:invented-id",
+      id: "other:invented-id-test-fake",
       confidence: 0.92,
       evidence: "exact CV phrase",
     });
@@ -45,16 +50,16 @@ describe("canonicalizeExtractedSkills", () => {
 
   it("preserves order", () => {
     const input = [
-      mk("invented-1"),
+      mk("invented-1-test-fake"),
       mk("teaching"),
-      mk("invented-2"),
+      mk("invented-2-test-fake"),
       mk("other:custom"),
     ];
     const result = canonicalizeExtractedSkills(input);
     expect(result.map((s) => s.id)).toEqual([
-      "other:invented-1",
+      "other:invented-1-test-fake",
       "teaching",
-      "other:invented-2",
+      "other:invented-2-test-fake",
       "other:custom",
     ]);
   });
