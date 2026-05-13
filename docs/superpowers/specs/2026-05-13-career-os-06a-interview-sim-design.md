@@ -57,8 +57,10 @@ components/interview/
 └── HistoryList.tsx                   Up to 5 past sessions
 
 lib/interview/
-├── personas.ts                       Frozen persona definitions (id, name_he, description_he, system_prompt_overlay)
-├── prompt.ts                         composeInterviewSystemPrompt({persona, targetRole, questionCount, maxQuestions})
+├── personas.ts                       Frozen persona definitions (id, label_he, description_he, system_prompt_overlay) — no interviewer names
+├── prompt.ts                         Two exports, enforcing the cache rule by signature:
+│                                       • composeSystemPrompt({persona, targetRole, occupationSkills}) — stable per session
+│                                       • composeTurnPreamble({questionCount, maxQuestions}) — Mode A or Mode B per §5.3
 ├── tools.ts                          makeWrapUpTool({sessionId}) — Anthropic tool with server execute()
 └── types.ts                          Persona, InterviewSession, InterviewMessage, WrapUpPayload
 
@@ -108,6 +110,7 @@ create table interview_sessions (
   feedback_per_question jsonb,         -- [{ question_number, note_he }]
   feedback_strengths_he jsonb,         -- string[]
   feedback_improvements_he jsonb,      -- string[]
+  feedback_next_practice_focus_he text,-- single actionable next thing to practice
   forced_wrap boolean not null default false,  -- true if server force-completed (model failed to call wrap_up)
   created_at timestamptz not null default now()
 );
@@ -167,6 +170,8 @@ After migration: `npm run db:types` to regenerate `lib/db/types.gen.ts`.
 5. אל תקרא לכלי `wrap_up` לפני שאלה 5. אל תחכה מעבר למכסה.
 6. אל תאשר את התשובה ("מצוין!", "תשובה נהדרת"). מראיין אמיתי לא מתפעל.
    אישור קצר ("הבנתי", "תודה") ומעבר לשאלה הבאה.
+7. עברית ניטרלית מגדרית בלבד: "את/ה", "ספר/י", "התמודד/ת", "תאר/י".
+   לעולם אל תניח מגדר של המרואיין/ת.
 
 פרטי הראיון:
 - סוג ראיון: {persona_label_he}
@@ -179,20 +184,19 @@ After migration: `npm run db:types` to regenerate `lib/db/types.gen.ts`.
 
 ### 5.2 Persona overlays
 
+No persona names are used in the LLM input or surfaced in the UI. The interviewer self-identifies by role only ("שלום, אני המראיינ/ת מטעם {target_role_he}…"). Avoids name-mismatch awkwardness (a "דניאל" interviewing a female user) and removes one axis of bias.
+
 **HR (`persona = 'hr'`):**
-- Persona name: "אורית" (default — frozen string, not LLM-generated)
 - Question style: behavioral, STAR-friendly ("ספר/י לי על מקרה שבו…"), culture-fit probes ("איך את/ה מתמודד/ת עם…")
 - Sample bank of 12 behavioral seed questions in the overlay; model picks/adapts but isn't forced to a script
-- Tone: warm but professional; "את/ה" not "אתה" (gender-neutral default)
+- Tone: warm but professional
 
 **Technical (`persona = 'technical'`):**
-- Persona name: "דניאל"
 - Question style: domain probes tailored to `target_occupation` — if `target_occupation_id` is non-null, the prompt injects the occupation's `skills` array verbatim and instructs the model to ask about 2-3 of them. If null, generic technical-interviewer mode.
 - Includes one "walk me through how you'd approach X" problem
 - Tone: precise, no small talk
 
 **First-job (`persona = 'first_job'`):**
-- Persona name: "מיכל"
 - Question style: motivation, learning style, "what draws you to this field", "tell me about a project (any project) you enjoyed". Explicitly acknowledges the user may have no work experience without lowering the substantive bar.
 - Tone: warmer than HR, but not condescending. No "easy" questions just because they're junior.
 
@@ -200,13 +204,25 @@ All three overlays end with a fixed reminder: *"חובה: כשתגיע למכס�
 
 ### 5.3 Per-turn user-message preamble
 
-Every user turn (including `__start__`) is wrapped server-side before being sent to the model:
+Every user turn (including `__start__`) is wrapped server-side before being sent to the model. The preamble has **two modes** driven by the current `question_count`:
+
+**Mode A — asking mode** (when `question_count < max_questions`):
 
 ```
 [שאלה {question_count + 1} מתוך {max_questions}]
 
 {actual user message OR "" for __start__}
 ```
+
+**Mode B — wrap-up mode** (when `question_count >= max_questions`):
+
+```
+[המשתמש סיים לענות על השאלה האחרונה. הראיון הסתיים. עליך לקרוא לכלי wrap_up עכשיו עם המשוב המובנה. אל תשאל שאלה נוספת.]
+
+{actual user message — the user's answer to Q{max_questions}}
+```
+
+The switch flips after the user submits their answer to Q{max_questions}. That answer is persisted, `question_count` is now at the cap, and the NEXT request to the model uses Mode B — so the model never sees "שאלה 9 מתוך 8". The model is expected to respond by calling `wrap_up`; if it doesn't, the runaway escalation in §7 kicks in.
 
 This is the only place `question_count` and `max_questions` appear in the LLM input. Keeps the cached system message stable; the cheap per-turn preamble is part of the user message that varies each turn anyway.
 
@@ -224,6 +240,7 @@ export function makeWrapUpTool(sessionId: string, currentQuestionCount: number) 
       summary_he: z.string().min(20).describe("2-4 sentences of overall feedback in Hebrew"),
       strengths_he: z.array(z.string()).min(1).max(4),
       improvements_he: z.array(z.string()).min(1).max(4),
+      next_practice_focus_he: z.string().min(10).describe("ONE concrete thing the user should practice next. One sentence. Actionable."),
       per_question: z.array(z.object({
         question_number: z.number().int().min(1),
         note_he: z.string(),
@@ -242,6 +259,7 @@ export function makeWrapUpTool(sessionId: string, currentQuestionCount: number) 
         feedback_summary_he: input.summary_he,
         feedback_strengths_he: input.strengths_he,
         feedback_improvements_he: input.improvements_he,
+        feedback_next_practice_focus_he: input.next_practice_focus_he,
         feedback_per_question: input.per_question,
       });
       return { wrapped: true };
@@ -316,7 +334,7 @@ Same architectural pattern as Phase 2's `set_stage`: server-side `execute` keeps
 | Stream interrupted mid-turn (network) | `streamText`'s `onFinish` callback persists the assistant message even if client disconnects. On re-open of the session, history shows what was persisted. (`question_count` is incremented inside `onFinish`, so an interrupted turn that didn't complete server-side never increments the counter.) |
 | `wrap_up` tool's `execute()` throws | Logged via `console.error` (Sentry comes in 6c). Tool result returns `{ wrapped: false, error: '...' }`. Client shows generic error in WrapUpScreen with a "retry" button that re-sends the last user turn — model will retry `wrap_up`. |
 | User picks free-text role, no occupation match | `target_occupation_id = null`. Technical persona falls back to "general technical interview for {target_role_he}" — no occupation skill injection. HR + First-job are unaffected (they don't use occupation skills). |
-| Max questions hit, model didn't call `wrap_up` | **Three-tier escalation, hard floor at the end:** (1) `question_count == max_questions` → next turn's user-message preamble adds: *"שים לב: עברנו את המכסה. עליך לקרוא ל-wrap_up עכשיו."* (2) Still no wrap_up by `question_count == max_questions + 2` → server force-completes: writes a templated `feedback_summary_he = he.interview.fallback.modelFailedToWrap`, sets `completed_at = now()`, returns `{ wrapped: true, forced: true }` to client. Session lands in WrapUpScreen with a generic feedback message + a flag in the row that 6c's Sentry can pick up. No infinite-question runaway. |
+| Max questions hit, model didn't call `wrap_up` | **Three-tier escalation, hard floor at the end.** (1) After the user answers Q{max_questions}, the next turn's preamble switches to Mode B (wrap instruction). Model is *expected* to call `wrap_up`. (2) If the model still doesn't call `wrap_up` and asks another question instead, server intercepts at `question_count == max_questions + 1`: discards the model's question (does not persist), runs **a feedback-only repair call** — a `generateObject` invocation against the same `wrap_up` zod schema, no tools, no streaming, the full transcript as user input, a stripped-down system prompt that just says "Produce a wrap_up object for this finished interview." If the repair call succeeds, persist its output and mark `forced_wrap = true` (so we can audit how often this happens). (3) If the repair call ALSO fails (LLM error, validation error, timeout), THEN write a templated `feedback_summary_he = he.interview.fallback.modelFailedToWrap` (single sentence: "סיימת את הראיון. לא הצלחנו לייצר משוב מפורט הפעם — נסה ראיון נוסף"), set `completed_at = now()`, `forced_wrap = true`. Session always ends; user is never stuck. |
 | User closes tab during a turn | Server-side onFinish still persists. Tab reopen → session shows up in history as in-progress (or as a stale in-progress with last assistant message but no completion). Not a critical state — `/interview` always opens picker, user is never blocked. |
 | DB connection failure on session insert | Standard 500 + error toast on `/interview` picker. Form state preserved client-side so user can retry. |
 
@@ -324,13 +342,13 @@ Same architectural pattern as Phase 2's `set_stage`: server-side `execute` keeps
 
 ### 8.1 Unit tests
 
-- `tests/unit/interview/personas.test.ts` — assert frozen persona definitions (id values, all 3 present, name_he non-empty, system_prompt_overlay non-empty)
-- `tests/unit/interview/prompt.test.ts` — `composeInterviewSystemPrompt` produces expected string for each persona × (has occupation / no occupation) × different question_count values. Snapshot-style assertions on specific substrings.
+- `tests/unit/interview/personas.test.ts` — assert frozen persona definitions (id values, all 3 present, label_he non-empty, system_prompt_overlay non-empty, no proper-noun first names in overlay text)
+- `tests/unit/interview/prompt.test.ts` — `composeSystemPrompt` produces expected string for each persona × (has occupation / no occupation); asserts it contains NO per-turn variables (no "שאלה", no digits matching question counts). `composeTurnPreamble` produces Mode A output for `question_count < max_questions` and Mode B (wrap instruction) when `question_count >= max_questions`. Snapshot-style assertions on specific substrings.
 - `tests/unit/interview/tools.test.ts` — `makeWrapUpTool(sessionId).execute(input)` calls the DB layer with the right payload (mocked DB). Asserts validation rejects empty arrays, summary_he < 20 chars, etc.
 
 ### 8.2 Integration test
 
-- `tests/integration/interview-flow.test.ts` — uses the real `streamText` (gated on `ANTHROPIC_API_KEY` env presence; skipped in CI without it). Creates a session, sends `__start__`, sends 7 canned answers, asserts question_count = 8, asserts model called `wrap_up`, asserts feedback fields are populated, asserts `completed_at IS NOT NULL`.
+- `tests/integration/interview-flow.test.ts` — uses the real `streamText` (gated on `ANTHROPIC_API_KEY` env presence; skipped in CI without it). Creates a session with `max_questions=8`, sends `__start__` (model emits Q1), sends 8 canned user answers (one per question Q1..Q8), asserts the 9th turn switches the preamble to Mode B and the model calls `wrap_up` (not "שאלה 9"). Asserts `question_count = 8`, `feedback_summary_he` populated, `completed_at IS NOT NULL`, `forced_wrap = false`.
 
 ### 8.3 E2E script (ad-hoc, like Phase 3b's)
 
