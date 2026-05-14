@@ -344,6 +344,7 @@ export const he = {
       targetSectionTitle: "תפקיד יעד",
       targetFromRecs: "בחר מההמלצות שלך",
       targetCustom: "תפקיד אחר",
+      targetCustomPlaceholder: "לדוגמה: ראש צוות פיתוח",
       historyTitle: "ראיונות קודמים",
       historyEmpty: "עדיין לא קיימת/ ראיון. ההתחלה כאן.",
       start: "התחל ראיון",
