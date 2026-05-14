@@ -376,6 +376,8 @@ export const he = {
     },
     fallback: {
       modelFailedToWrap: "סיימת את הראיון. לא הצלחנו לייצר משוב מפורט הפעם — נסה ראיון נוסף.",
+      defaultNextFocus: "תרגל ראיון נוסף.",
+      placeholderBullet: "—",
     },
     errors: {
       sessionNotFound: "לא מצאנו את הראיון הזה.",

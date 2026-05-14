@@ -210,9 +210,9 @@ export async function POST(req: Request): Promise<Response> {
         } else {
           await completeInterviewSession(session.id, {
             summary_he: he.interview.fallback.modelFailedToWrap,
-            strengths_he: ["—"],
-            improvements_he: ["—"],
-            next_practice_focus_he: "תרגל ראיון נוסף.",
+            strengths_he: [he.interview.fallback.placeholderBullet],
+            improvements_he: [he.interview.fallback.placeholderBullet],
+            next_practice_focus_he: he.interview.fallback.defaultNextFocus,
             per_question: [],
             forcedWrap: true,
           });
