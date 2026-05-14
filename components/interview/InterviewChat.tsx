@@ -144,7 +144,7 @@ export function InterviewChat({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const text = input.trim();
     if (!text || sending) return;
