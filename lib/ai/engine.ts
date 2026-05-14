@@ -101,6 +101,7 @@ export async function streamLlmTurn(input: StreamLlmTurnInput): Promise<Response
   }
 
   // Safe (or sentinel) path — persist the user msg if any.
+  // Note: skipSafetyCheck does NOT suppress persistence; only empty userText does.
   if (userText) {
     await onUserPersist(userText, undefined);
   }
@@ -125,14 +126,26 @@ export async function streamLlmTurn(input: StreamLlmTurnInput): Promise<Response
         outputTokens: usage?.outputTokens,
         cacheReadTokens: cache.cacheReadInputTokens,
         cacheWriteTokens: cache.cacheCreationInputTokens,
-      });
+      }).catch((finishErr) =>
+        console.error(
+          `[${contextLabel}] onAssistantFinish threw id=${contextId}`,
+          finishErr,
+        ),
+      );
     },
     onError: async ({ error }) => {
       const message = error instanceof Error ? error.message : String(error);
       console.error(
         `[${contextLabel}] streamText error id=${contextId} error=${message}`,
       );
-      if (onError) await onError(error);
+      if (onError) {
+        await onError(error).catch((secondary) =>
+          console.error(
+            `[${contextLabel}] onError callback threw id=${contextId}`,
+            secondary,
+          ),
+        );
+      }
     },
   });
 
