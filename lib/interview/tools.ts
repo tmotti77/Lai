@@ -1,5 +1,5 @@
 import "server-only";
-import { tool, generateObject } from "ai";
+import { tool, generateText, Output } from "ai";
 import { z } from "zod";
 import { anthropic, MODEL_ID } from "@/lib/ai/client";
 import { completeInterviewSession } from "@/lib/db/interview";
@@ -37,24 +37,27 @@ export function makeWrapUpTool(sessionId: string, currentQuestionCount: number) 
 
 /**
  * Repair call: when the model fails to call wrap_up despite Mode B prompting,
- * run a one-shot generateObject against the full transcript to extract feedback.
- * Returns the wrap-up payload or null on failure.
+ * run a one-shot structured generation against the full transcript to extract
+ * feedback. Returns the wrap-up payload or null on failure.
+ *
+ * Uses generateText with Output.object — the AI SDK v6 idiomatic replacement
+ * for the deprecated generateObject API.
  */
 export async function runWrapRepairCall(
   transcript: Array<{ role: "user" | "assistant" | "system"; content: string }>,
   targetRoleHe: string,
 ): Promise<WrapUpInput | null> {
   try {
-    const result = await generateObject({
+    const result = await generateText({
       model: anthropic(MODEL_ID),
-      schema: WrapUpSchema,
+      output: Output.object({ schema: WrapUpSchema }),
       system: `אתה מסכם ראיון עבודה שהסתיים. עבור על התמליל וייצר אובייקט wrap_up מובנה בעברית. תפקיד היעד: ${targetRoleHe}. אל תוסיף שאלות חדשות — רק סכם.`,
       messages: transcript.map((m) => ({
         role: m.role === "system" ? "user" : m.role,
         content: m.content,
       })),
     });
-    return result.object;
+    return result.output;
   } catch (err) {
     console.error("[interview] wrap repair call failed", err);
     return null;
