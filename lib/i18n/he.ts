@@ -369,6 +369,8 @@ export const he = {
       restartCta: "תרגל ראיון נוסף",
       doneCta: "סיים",
       forcedNote: "הראיון הסתיים, אך לא הצלחנו לייצר משוב מפורט. נסה ראיון נוסף.",
+      questionLabel: "שאלה {n}",
+      transcriptToggle: "תמליל",
     },
     persona: {
       hr: { label: "ראיון משאבי אנוש", description: "ראיון התנהגותי — שאלות על העבר, התמודדויות ויחסי עבודה." },
