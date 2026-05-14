@@ -39,7 +39,7 @@ const StartSchema = z.object({
 
 const TurnSchema = z.object({
   action: z.literal("turn"),
-  sessionId: z.string().uuid(),
+  sessionId: z.uuid(),
   message: z.string().min(1).max(8000),
 });
 
