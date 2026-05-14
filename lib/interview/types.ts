@@ -1,5 +1,3 @@
-import "server-only";
-
 export const PERSONA_IDS = ["hr", "technical", "first_job"] as const;
 export type PersonaId = (typeof PERSONA_IDS)[number];
 

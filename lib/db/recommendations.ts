@@ -55,3 +55,31 @@ export async function saveRecommendation(args: {
   });
   if (error) throw error;
 }
+
+/**
+ * Returns the most recently generated recommendation for this user,
+ * regardless of profile_hash. Used by surfaces that want to show
+ * the user's "latest known recommendations" without re-computing.
+ *
+ * Returns null if the user has never run recommendations.
+ */
+export async function getLatestRecommendationForUser(
+  userId: string,
+): Promise<CachedRecommendation | null> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from("recommendations")
+    .select("rankings, paths, prose, generated_at")
+    .eq("user_id", userId)
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    rankings: data.rankings as never,
+    paths: data.paths as never,
+    prose: data.prose as never,
+    generatedAt: data.generated_at,
+  };
+}
