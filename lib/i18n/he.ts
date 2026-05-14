@@ -336,6 +336,53 @@ export const he = {
       noFile: "לא נבחר קובץ.",
     },
   },
+  interview: {
+    landing: {
+      title: "סימולטור ראיונות",
+      subtitle: "בחר/י סוג ראיון ותפקיד כדי להתחיל.",
+      personaSectionTitle: "סוג ראיון",
+      targetSectionTitle: "תפקיד יעד",
+      targetFromRecs: "בחר מההמלצות שלך",
+      targetCustom: "תפקיד אחר",
+      historyTitle: "ראיונות קודמים",
+      historyEmpty: "עדיין לא קיימת/ ראיון. ההתחלה כאן.",
+      start: "התחל ראיון",
+      cantStartNoRole: "בחר/י תפקיד כדי להמשיך",
+    },
+    counter: {
+      label: "שאלה {current} מתוך {total}",
+      wrappingUp: "מסכם את הראיון…",
+    },
+    chat: {
+      composerPlaceholder: "כתוב/כתבי את התשובה שלך…",
+      send: "שלח",
+      youSaid: "את/ה",
+      interviewer: "המראיין",
+    },
+    wrap: {
+      heading: "סיום הראיון — משוב",
+      strengthsTitle: "מה עבד",
+      improvementsTitle: "מה אפשר לחדד",
+      nextFocusTitle: "להמשך תרגול",
+      perQuestionTitle: "הערות לפי שאלה",
+      restartCta: "תרגל ראיון נוסף",
+      doneCta: "סיים",
+      forcedNote: "הראיון הסתיים, אך לא הצלחנו לייצר משוב מפורט. נסה ראיון נוסף.",
+    },
+    persona: {
+      hr: { label: "ראיון משאבי אנוש", description: "ראיון התנהגותי — שאלות על העבר, התמודדויות ויחסי עבודה." },
+      technical: { label: "ראיון טכני", description: "ראיון מקצועי — שאלות מתחום התפקיד וגישות לפתרון בעיות." },
+      first_job: { label: "ראיון לעבודה ראשונה", description: "ראיון תומך — דגש על מוטיבציה וסקרנות." },
+    },
+    fallback: {
+      modelFailedToWrap: "סיימת את הראיון. לא הצלחנו לייצר משוב מפורט הפעם — נסה ראיון נוסף.",
+    },
+    errors: {
+      sessionNotFound: "לא מצאנו את הראיון הזה.",
+      startFailed: "לא הצלחנו להתחיל את הראיון. נסה/י שוב.",
+      streamFailed: "שגיאה בזרם הראיון. נסה/י לשלוח שוב.",
+    },
+  },
   plan: {
     title: "תוכנית 30 יום",
     subtitle: "המסלול שבחרת מתורגם לפעולות יומיות. סמן מה שעשית, חזור מתי שצריך.",
