@@ -291,6 +291,109 @@ export type Database = {
           },
         ]
       }
+      interview_messages: {
+        Row: {
+          cache_read_tokens: number | null
+          cache_write_tokens: number | null
+          content: string
+          created_at: string
+          id: string
+          role: string
+          safety_flag: string | null
+          session_id: string
+        }
+        Insert: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          safety_flag?: string | null
+          session_id: string
+        }
+        Update: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          safety_flag?: string | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "interview_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interview_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          feedback_improvements_he: Json | null
+          feedback_next_practice_focus_he: string | null
+          feedback_per_question: Json | null
+          feedback_strengths_he: Json | null
+          feedback_summary_he: string | null
+          forced_wrap: boolean
+          id: string
+          max_questions: number
+          persona: string
+          question_count: number
+          target_occupation_id: string | null
+          target_role_he: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          feedback_improvements_he?: Json | null
+          feedback_next_practice_focus_he?: string | null
+          feedback_per_question?: Json | null
+          feedback_strengths_he?: Json | null
+          feedback_summary_he?: string | null
+          forced_wrap?: boolean
+          id?: string
+          max_questions?: number
+          persona: string
+          question_count?: number
+          target_occupation_id?: string | null
+          target_role_he: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          feedback_improvements_he?: Json | null
+          feedback_next_practice_focus_he?: string | null
+          feedback_per_question?: Json | null
+          feedback_strengths_he?: Json | null
+          feedback_summary_he?: string | null
+          forced_wrap?: boolean
+          id?: string
+          max_questions?: number
+          persona?: string
+          question_count?: number
+          target_occupation_id?: string | null
+          target_role_he?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           cache_read_tokens: number | null
