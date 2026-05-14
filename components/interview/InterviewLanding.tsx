@@ -68,7 +68,7 @@ export function InterviewLanding({
         <h2 className="text-base font-medium">
           {he.interview.landing.personaSectionTitle}
         </h2>
-        <PersonaSelector value={persona} onChange={setPersona} />
+        <PersonaSelector value={persona} onChangeAction={setPersona} />
       </section>
 
       <section className="space-y-3">
@@ -78,12 +78,12 @@ export function InterviewLanding({
         <TargetRolePicker
           topRoles={topRoles}
           occupationId={targetOccupationId}
-          onSelectOccupation={(id) => {
+          onSelectOccupationAction={(id) => {
             setTargetOccupationId(id);
             setTargetFreeText("");
           }}
           freeText={targetFreeText}
-          onChangeFreeText={(t) => {
+          onChangeFreeTextAction={(t) => {
             setTargetFreeText(t);
             if (t.trim().length > 0) setTargetOccupationId(null);
           }}
