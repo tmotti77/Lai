@@ -44,3 +44,6 @@ next-env.d.ts
 # Phase 5a spike artifact
 spike.pdf
 scripts/test-cv.pdf
+
+# Playwright smoke-test screenshots (ephemeral)
+interview-landing.png
