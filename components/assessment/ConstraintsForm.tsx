@@ -30,7 +30,7 @@ export function ConstraintsForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
     setSubmitError(null);

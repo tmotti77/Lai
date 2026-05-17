@@ -397,7 +397,6 @@ export const he = {
       sessionNotFound: "לא מצאנו את הראיון הזה.",
       startFailed: "לא הצלחנו להתחיל את הראיון. נסה/י שוב.",
       streamFailed: "שגיאה בזרם הראיון. נסה/י לשלוח שוב.",
-      toggleError: "לא הצלחנו לעדכן. נסה שוב.",
     },
   },
   plan: {
