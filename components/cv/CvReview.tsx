@@ -354,13 +354,13 @@ function SkillCard({
 
   return (
     <div className="group rounded-xl border bg-card p-4 transition-shadow hover:shadow-sm">
-      <button
-        type="button"
-        onClick={onToggleExpand}
-        className="flex w-full items-start justify-between gap-2 text-right"
-        aria-expanded={expanded}
-      >
-        <div className="min-w-0 flex-1">
+      <div className="flex w-full items-start justify-between gap-2 text-right">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="min-w-0 flex-1 text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+          aria-expanded={expanded}
+        >
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} aria-hidden />
             <span className="truncate text-base font-semibold">{skill.name_he}</span>
@@ -370,13 +370,10 @@ function SkillCard({
               {he.cv.review.categories[skill.category as keyof typeof he.cv.review.categories] ?? skill.category}
             </span>
           )}
-        </div>
+        </button>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
+          onClick={onDismiss}
           aria-label={he.cv.review.dismiss}
           className="text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100 sm:opacity-0"
         >
@@ -384,7 +381,7 @@ function SkillCard({
             <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
           </svg>
         </button>
-      </button>
+      </div>
       {expanded && skill.evidence && (
         <div className="mt-3 rounded-md bg-muted/50 p-2.5 text-xs leading-relaxed">
           <span className="font-medium text-muted-foreground">{he.cv.review.evidenceLabel}</span>{" "}
