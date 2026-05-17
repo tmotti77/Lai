@@ -45,5 +45,6 @@ next-env.d.ts
 spike.pdf
 scripts/test-cv.pdf
 
-# Playwright smoke-test screenshots (ephemeral)
+# Playwright smoke-test artifacts (ephemeral)
 interview-landing.png
+/screenshots/
