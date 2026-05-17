@@ -171,6 +171,16 @@ export function InterviewChat({
         {messages.map((m, i) => (
           <InterviewMessage key={i} role={m.role} content={m.content} />
         ))}
+        {sending && messages.length === 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:0ms]" aria-hidden />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:150ms]" aria-hidden />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:300ms]" aria-hidden />
+            </span>
+            {he.interview.chat.loadingFirstQuestion}
+          </div>
+        )}
         <div ref={scrollRef} />
       </div>
 

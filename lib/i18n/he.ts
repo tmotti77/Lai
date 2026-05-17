@@ -75,6 +75,7 @@ export const he = {
       submitting: "שומר…",
       submitted: "נשמר. תודה!",
       error: "אירעה שגיאה. ננסה שוב?",
+      submitError: "שמירת השאלון נכשלה. בדוק חיבור לאינטרנט ונסה שוב.",
       progress: "{current} מתוך {total}",
     },
     likert: {
@@ -328,9 +329,17 @@ export const he = {
     },
     errors: {
       fileTooLarge: "הקובץ גדול מדי. הגודל המקסימלי הוא 10MB.",
+      // API returns "file_too_large" (snake_case) — alias so client lookup hits.
+      file_too_large: "הקובץ גדול מדי. הגודל המקסימלי הוא 10MB.",
       unsupportedType: "סוג קובץ לא נתמך. אנא העלה PDF או DOCX.",
+      // API returns "unsupported_type"
+      unsupported_type: "סוג קובץ לא נתמך. אנא העלה PDF או DOCX.",
       emptyText: "לא הצלחנו לקרוא טקסט מהקובץ. אולי הוא סרוק? נסה PDF טקסטואלי.",
+      // API returns "empty_text"
+      empty_text: "לא הצלחנו לקרוא טקסט מהקובץ. אולי הוא סרוק? נסה PDF טקסטואלי.",
       parseError: "אירעה שגיאה בקריאת הקובץ. נסה קובץ אחר.",
+      // API returns "parse_failed"
+      parse_failed: "אירעה שגיאה בקריאת הקובץ. נסה קובץ אחר.",
       uploadFailed: "ההעלאה נכשלה. נסה שוב.",
       extractionFailed: "ניתוח הכישורים נכשל. נסה שוב.",
       saveFailed: "שמירת הכישורים נכשלה. נסה שוב.",
@@ -360,6 +369,7 @@ export const he = {
       send: "שלח",
       youSaid: "את/ה",
       interviewer: "המראיין",
+      loadingFirstQuestion: "ממתין לשאלה הראשונה…",
     },
     wrap: {
       heading: "סיום הראיון — משוב",
@@ -387,11 +397,14 @@ export const he = {
       sessionNotFound: "לא מצאנו את הראיון הזה.",
       startFailed: "לא הצלחנו להתחיל את הראיון. נסה/י שוב.",
       streamFailed: "שגיאה בזרם הראיון. נסה/י לשלוח שוב.",
+      toggleError: "לא הצלחנו לעדכן. נסה שוב.",
     },
   },
   plan: {
     title: "תוכנית 30 יום",
     subtitle: "המסלול שבחרת מתורגם לפעולות יומיות. סמן מה שעשית, חזור מתי שצריך.",
+    loading: "טוען תוכנית…",
+    toggleError: "לא הצלחנו לעדכן את המשימה. נסה שוב.",
     archetypeTitles: {
       apply: "תוכנית מעשית: להתחיל לעבוד",
       taste_test: "תוכנית טעימה: לבדוק את הכיוון",

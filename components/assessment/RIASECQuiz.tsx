@@ -12,6 +12,7 @@ export function RIASECQuiz() {
   const router = useRouter();
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const total = RIASEC_ITEMS.length;
   const answered = Object.keys(responses).length;
   const allAnswered = answered === total;
@@ -19,6 +20,7 @@ export function RIASECQuiz() {
   const onSubmit = async () => {
     if (!allAnswered) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetch("/api/assessment/submit", {
         method: "POST",
@@ -27,6 +29,7 @@ export function RIASECQuiz() {
       });
       if (!res.ok) {
         toast.error(he.assessment.common.error);
+        setSubmitError(he.assessment.common.submitError);
         setSubmitting(false);
         return;
       }
@@ -34,6 +37,7 @@ export function RIASECQuiz() {
       router.push("/assessment");
     } catch {
       toast.error(he.assessment.common.error);
+      setSubmitError(he.assessment.common.submitError);
       setSubmitting(false);
     }
   };
@@ -52,6 +56,11 @@ export function RIASECQuiz() {
           onChange={(n) => setResponses((prev) => ({ ...prev, [item.id]: n }))}
         />
       ))}
+      {submitError && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {submitError}
+        </div>
+      )}
       <Button
         type="button"
         size="lg"

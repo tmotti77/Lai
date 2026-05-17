@@ -15,6 +15,7 @@ export function ValuesPicker() {
   const [picked, setPicked] = useState<string[]>([]);
   const [ranked, setRanked] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const togglePick = (id: string) => {
     setPicked((prev) =>
@@ -50,6 +51,7 @@ export function ValuesPicker() {
       return;
     }
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetch("/api/assessment/submit", {
         method: "POST",
@@ -58,6 +60,7 @@ export function ValuesPicker() {
       });
       if (!res.ok) {
         toast.error(he.assessment.common.error);
+        setSubmitError(he.assessment.common.submitError);
         setSubmitting(false);
         return;
       }
@@ -65,6 +68,7 @@ export function ValuesPicker() {
       router.push("/assessment");
     } catch {
       toast.error(he.assessment.common.error);
+      setSubmitError(he.assessment.common.submitError);
       setSubmitting(false);
     }
   };
@@ -133,6 +137,11 @@ export function ValuesPicker() {
           );
         })}
       </ol>
+      {submitError && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {submitError}
+        </div>
+      )}
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => setStep("pick")}>
           {he.assessment.common.back}
