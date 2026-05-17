@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { getProfile } from "@/lib/db/profile";
@@ -14,7 +15,7 @@ import { requireConsent, NoConsentError } from "@/lib/consent";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const internalUserId = await getOrCreateAnonymousUserId(user?.id);
@@ -29,6 +30,17 @@ export async function POST() {
   }
 
   try {
+    // Read optional force flag from body. Empty/missing body is fine.
+    let body: { force?: boolean } = {};
+    try {
+      if (request.headers.get("content-type")?.includes("application/json")) {
+        body = (await request.json().catch(() => ({}))) as { force?: boolean };
+      }
+    } catch {
+      // ignore body parse failures — treat as no body
+    }
+    const force = body.force === true;
+
     const [profileRaw, occupations, catalogVersion] = await Promise.all([
       getMostRecentConversationProfile(internalUserId),
       loadAllOccupations(),
@@ -38,15 +50,17 @@ export async function POST() {
     const profile = buildMatchingProfile(profileRaw as Parameters<typeof buildMatchingProfile>[0]);
     const hash = profileHash(profile, catalogVersion);
 
-    const cached = await getCached(internalUserId, hash);
-    if (cached) {
-      return Response.json({
-        rankings: cached.rankings,
-        paths: cached.paths,
-        prose: cached.prose,
-        cached: true,
-        generated_at: cached.generatedAt,
-      });
+    if (!force) {
+      const cached = await getCached(internalUserId, hash);
+      if (cached) {
+        return Response.json({
+          rankings: cached.rankings,
+          paths: cached.paths,
+          prose: cached.prose,
+          cached: true,
+          generated_at: cached.generatedAt,
+        });
+      }
     }
 
     const rankings = rankOccupations(profile, occupations);

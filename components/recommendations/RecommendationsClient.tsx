@@ -40,6 +40,10 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
     try {
       const res = await fetch("/api/recommendations", {
         method: "POST",
+        ...(force && {
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ force: true }),
+        }),
         cache: force ? "no-store" : "default",
       });
       if (!res.ok) {
