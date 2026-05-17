@@ -9,16 +9,26 @@ import { pickPaths } from "@/lib/matching/paths";
 import { profileHash } from "@/lib/matching/hash";
 import { generateExplanations } from "@/lib/ai/prompts/explanations";
 import { createServiceClient } from "@/lib/supabase/service";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const internalUserId = await getOrCreateAnonymousUserId(user?.id);
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const internalUserId = await getOrCreateAnonymousUserId(user?.id);
 
+  try {
+    await requireConsent(internalUserId);
+  } catch (e) {
+    if (e instanceof NoConsentError) {
+      return Response.json({ error: "no_consent" }, { status: 403 });
+    }
+    throw e;
+  }
+
+  try {
     const [profileRaw, occupations, catalogVersion] = await Promise.all([
       getMostRecentConversationProfile(internalUserId),
       loadAllOccupations(),

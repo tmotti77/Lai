@@ -20,6 +20,7 @@ import { PERSONA_IDS } from "@/lib/interview/types";
 import type { Occupation } from "@/lib/matching/types";
 import taxonomy from "@/content/skills/taxonomy.json";
 import { he } from "@/lib/i18n/he";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,6 +72,15 @@ export async function POST(req: Request): Promise<Response> {
     data: { user },
   } = await supabase.auth.getUser();
   const userId = await getOrCreateAnonymousUserId(user?.id);
+
+  try {
+    await requireConsent(userId);
+  } catch (e) {
+    if (e instanceof NoConsentError) {
+      return Response.json({ error: "no_consent" }, { status: 403 });
+    }
+    throw e;
+  }
 
   // === START ===
   if (body.action === "start") {

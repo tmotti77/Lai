@@ -7,6 +7,7 @@ import {
   ACCEPTED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,
 } from "@/lib/cv/types";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -38,6 +39,15 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const userId = await getOrCreateAnonymousUserId(user?.id);
+
+  try {
+    await requireConsent(userId);
+  } catch (e) {
+    if (e instanceof NoConsentError) {
+      return Response.json({ error: "no_consent" }, { status: 403 });
+    }
+    throw e;
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
