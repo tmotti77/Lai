@@ -86,7 +86,7 @@ export function ValuesPicker() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => togglePick(opt.id)}
-                  className={`min-h-11 w-full rounded-lg border p-3 text-start transition-colors ${
+                  className={`min-h-11 w-full rounded-lg border p-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                     selected ? "border-primary bg-primary/5" : "border-input hover:bg-accent"
                   }`}
                 >
@@ -122,7 +122,7 @@ export function ValuesPicker() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => toggleRank(opt.id)}
-                className={`flex min-h-11 w-full items-center justify-between rounded-lg border p-3 transition-colors ${
+                className={`flex min-h-11 w-full items-center justify-between rounded-lg border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   selected ? "border-primary bg-primary/5" : "border-input hover:bg-accent"
                 }`}
               >

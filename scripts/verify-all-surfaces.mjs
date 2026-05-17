@@ -39,7 +39,8 @@ const SURFACES = [
   { path: "/assessment/big5",        name: "assessment-big5"       },
   { path: "/assessment/values",      name: "assessment-values"     },
   { path: "/assessment/constraints", name: "assessment-constraints"},
-  { path: "/recommendations",        name: "recommendations"       },
+  // /recommendations fires async API calls after load — use "load" so networkidle doesn't hang.
+  { path: "/recommendations",        name: "recommendations",      waitUntil: "load" },
   { path: "/plan",                   name: "plan"                  },
   { path: "/interview",              name: "interview"             },
   { path: "/sign-in",                name: "sign-in"               },
@@ -67,13 +68,19 @@ for (const viewport of VIEWPORTS) {
     if (m.type() === "error") allErrors.push({ kind: "console.error", msg: m.text() });
   });
 
+  // Bootstrap consent once per context so /recommendations renders without 403.
+  // Step 1: navigate to / so the middleware assigns the co_anon cookie to this context.
+  // Step 2: POST /api/consent via the context's request API (shares cookies with the page).
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle", timeout: 30000 });
+  await ctx.request.post(`${BASE}/api/consent`);
+
   for (const surface of SURFACES) {
     const url = `${BASE}${surface.path}`;
     const errorsBefore = allErrors.length;
     const result = { viewport: viewport.name, surface: surface.name, url };
 
     try {
-      const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      const response = await page.goto(url, { waitUntil: surface.waitUntil ?? "networkidle", timeout: 30000 });
       result.status = response?.status() ?? null;
 
       await page.screenshot({

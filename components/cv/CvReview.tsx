@@ -242,7 +242,7 @@ export function CvReview({
                   key={sug.id}
                   type="button"
                   onClick={() => addManualTaxonomy(sug)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-right text-sm hover:bg-accent"
+                  className="flex w-full items-center justify-between px-3 py-2 text-right text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
                 >
                   <span>{sug.name_he}</span>
                   <span className={`text-xs ${CATEGORY_TEXT_COLORS[sug.category] ?? "text-muted-foreground"}`}>
@@ -255,7 +255,7 @@ export function CvReview({
           {manualInput.trim().length >= 2 && manualSuggestions.length === 0 && (
             <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover p-2 text-xs text-muted-foreground">
               {he.cv.review.noMatches} —{" "}
-              <button type="button" onClick={addManualFreeText} className="underline">
+              <button type="button" onClick={addManualFreeText} className="underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                 {`הוסף "${manualInput.trim()}"`}
               </button>
             </div>
@@ -274,7 +274,7 @@ export function CvReview({
                 key={skill.id}
                 type="button"
                 onClick={() => toggle(skill.id)}
-                className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs hover:bg-accent"
+                className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <span>{skill.name_he}</span>
                 <span className="text-muted-foreground">+</span>
@@ -375,7 +375,7 @@ function SkillCard({
           type="button"
           onClick={onDismiss}
           aria-label={he.cv.review.dismiss}
-          className="text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100 sm:opacity-0"
+          className="rounded-sm text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 sm:opacity-0"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
             <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
