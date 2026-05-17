@@ -53,6 +53,13 @@ export async function POST(req: Request) {
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
+  // Append the current user turn so the LLM sees it. The engine persists via
+  // onUserPersist AFTER loadMessages, so without this, streamText only sees
+  // prior history — Claude would answer to stale context.
+  const messagesForLlm: ModelMessage[] = userText
+    ? [...historyAsModelMessages, { role: "user", content: userText }]
+    : historyAsModelMessages;
+
   const setCookie = `${ACTIVE_CONVERSATION_COOKIE}=${conversation.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ACTIVE_CONVERSATION_MAX_AGE_SECONDS}${
     process.env.NODE_ENV === "production" ? "; Secure" : ""
   }`;
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
   return streamLlmTurn({
     userText,
     systemMessage: getCachedSystemMessage(currentStage),
-    history: historyAsModelMessages,
+    history: messagesForLlm,
     tools: { set_stage: setStageTool },
     contextLabel: "chat",
     contextId: conversation.id,
