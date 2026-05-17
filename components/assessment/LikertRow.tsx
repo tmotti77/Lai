@@ -25,7 +25,7 @@ export function LikertRow({
               aria-pressed={selected}
               aria-label={he.assessment.likert[String(n) as "1"|"2"|"3"|"4"|"5"]}
               onClick={() => onChange(n)}
-              className={`flex h-11 min-w-11 flex-1 items-center justify-center rounded-md border text-sm transition-colors ${
+              className={`flex h-11 min-w-11 flex-1 items-center justify-center rounded-md border text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 selected
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-input bg-background hover:bg-accent"

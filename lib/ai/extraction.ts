@@ -1,5 +1,5 @@
 import "server-only";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { anthropic, MODEL_ID } from "@/lib/ai/client";
 import { loadMessages } from "@/lib/db/queries";
@@ -27,41 +27,51 @@ const SkillSchema = z.object({
   source: z.enum(["army", "work", "studies", "hobby", "self-taught", "other"]),
 });
 
-const ValueSchema = z.object({
-  key: z.enum([
-    "money",
-    "stability",
-    "meaning",
-    "impact",
-    "freedom",
-    "prestige",
-    "learning",
-    "belonging",
-    "schedule",
-    "creation",
-    "balance",
-  ]),
-  label_he: z.string(),
-  evidence: z.string(),
-  weight: z.enum(["primary", "secondary"]),
-});
+// Value vocabulary keys — must match lib/matching/types.ts values_fit strings
+// and the formal assessment items in lib/assessment/values/items.ts.
+const VALUE_KEYS = [
+  "money",
+  "stability",
+  "meaning",
+  "impact",
+  "freedom",
+  "prestige",
+  "learning",
+  "belonging",
+  "schedule",
+  "creation",
+  "balance",
+] as const;
 
+// Chat-extracted values are stored as a flat string[] in career_profile.data.values.
+// buildMatchingProfile (lib/matching/profile.ts) slices [0..3] → topThree, [3..5] → alsoPicked.
+// Extraction emits primary values first, then secondary, so the slice works correctly.
+// Using z.enum here ensures the LLM emits canonical keys the matcher can look up.
+const ValueKeySchema = z.enum(VALUE_KEYS);
+
+// Constraints must mirror MatchingProfile["constraints"] in lib/matching/types.ts exactly,
+// so that the chat path and formal-assessment path both produce the same shape.
 const ConstraintsSchema = z.object({
-  budget_he: z.string().optional(),
-  time_per_week_hours: z.number().optional(),
   location_he: z.string().optional(),
-  income_urgency_he: z.string().optional(),
-  risk_tolerance_1_10: z.number().min(1).max(10).optional(),
+  remote_ok: z.boolean().optional(),
+  time_per_week_hours: z.number().min(0).max(60).optional(),
+  training_budget_nis: z.number().min(0).max(200_000).optional(),
+  // "none"|"basic"|"intermediate"|"advanced"|"fluent" — NEVER "native"
   english_level: z
-    .enum(["none", "basic", "intermediate", "advanced", "native"])
+    .enum(["none", "basic", "intermediate", "advanced", "fluent"])
     .optional(),
-  notes_he: z.string().optional(),
+  // Integer 1–10: 1 = most risk-averse, 10 = most risk-tolerant
+  risk_tolerance: z.number().int().min(1).max(10).optional(),
+  needs_immediate_income: z.boolean().optional(),
+  months_until_income_required: z.number().int().min(0).max(36).optional(),
 });
 
 const ProfileSchema = z.object({
   interests: z.array(InterestSchema).optional(),
   skills: z.array(SkillSchema).optional(),
-  values: z.array(ValueSchema).optional(),
+  // Flat string[] of canonical value keys, primary values first.
+  // Stored as career_profile.data.values and consumed by buildMatchingProfile.
+  values: z.array(ValueKeySchema).max(11).optional(),
   constraints: ConstraintsSchema.optional(),
   summary_he: z.string().optional(),
 });
@@ -83,14 +93,13 @@ export async function runExtraction(opts: {
     return null;
   }
 
-  const { object } = await generateObject({
+  const result = await generateText({
     model: anthropic(MODEL_ID),
     system: EXTRACTION_SYSTEM_PROMPT,
     prompt: buildExtractionUserPrompt(opts.stage, conversationText),
-    schema: ProfileSchema,
-    schemaName: "extract_profile",
-    schemaDescription: "Extracted profile data for this assessment stage.",
+    output: Output.object({ schema: ProfileSchema }),
   });
+  const object = result.output;
 
   await mergeProfileExtraction({
     userId: opts.userId,

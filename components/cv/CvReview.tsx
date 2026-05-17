@@ -49,6 +49,7 @@ export function CvReview({
   skills,
   otherSkills,
   saving,
+  saveDisabled,
   onSaveAction,
   onCancelAction,
 }: {
@@ -56,6 +57,8 @@ export function CvReview({
   skills: ExtractedSkill[];
   otherSkills: string[];
   saving: boolean;
+  /** Extra disabled flag for the save button, e.g. when cvUploadId is not yet set. */
+  saveDisabled?: boolean;
   onSaveAction: (skillIds: string[]) => void;
   onCancelAction: () => void;
 }) {
@@ -239,7 +242,7 @@ export function CvReview({
                   key={sug.id}
                   type="button"
                   onClick={() => addManualTaxonomy(sug)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-right text-sm hover:bg-accent"
+                  className="flex w-full items-center justify-between px-3 py-2 text-right text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
                 >
                   <span>{sug.name_he}</span>
                   <span className={`text-xs ${CATEGORY_TEXT_COLORS[sug.category] ?? "text-muted-foreground"}`}>
@@ -252,7 +255,7 @@ export function CvReview({
           {manualInput.trim().length >= 2 && manualSuggestions.length === 0 && (
             <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover p-2 text-xs text-muted-foreground">
               {he.cv.review.noMatches} —{" "}
-              <button type="button" onClick={addManualFreeText} className="underline">
+              <button type="button" onClick={addManualFreeText} className="underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                 {`הוסף "${manualInput.trim()}"`}
               </button>
             </div>
@@ -271,7 +274,7 @@ export function CvReview({
                 key={skill.id}
                 type="button"
                 onClick={() => toggle(skill.id)}
-                className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs hover:bg-accent"
+                className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <span>{skill.name_he}</span>
                 <span className="text-muted-foreground">+</span>
@@ -319,7 +322,7 @@ export function CvReview({
               <Button variant="ghost" onClick={onCancelAction} disabled={saving}>
                 {he.cv.review.cancel}
               </Button>
-              <Button onClick={() => onSaveAction(confirmed.map((s) => s.id))} disabled={saving || confirmed.length === 0}>
+              <Button onClick={() => onSaveAction(confirmed.map((s) => s.id))} disabled={saving || saveDisabled || confirmed.length === 0}>
                 {saving ? he.cv.review.saving : he.cv.review.save}
               </Button>
             </div>
@@ -351,13 +354,13 @@ function SkillCard({
 
   return (
     <div className="group rounded-xl border bg-card p-4 transition-shadow hover:shadow-sm">
-      <button
-        type="button"
-        onClick={onToggleExpand}
-        className="flex w-full items-start justify-between gap-2 text-right"
-        aria-expanded={expanded}
-      >
-        <div className="min-w-0 flex-1">
+      <div className="flex w-full items-start justify-between gap-2 text-right">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="min-w-0 flex-1 text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+          aria-expanded={expanded}
+        >
           <div className="flex items-center gap-2">
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} aria-hidden />
             <span className="truncate text-base font-semibold">{skill.name_he}</span>
@@ -367,21 +370,18 @@ function SkillCard({
               {he.cv.review.categories[skill.category as keyof typeof he.cv.review.categories] ?? skill.category}
             </span>
           )}
-        </div>
+        </button>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
+          onClick={onDismiss}
           aria-label={he.cv.review.dismiss}
-          className="text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100 sm:opacity-0"
+          className="rounded-sm text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 sm:opacity-0"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
             <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
           </svg>
         </button>
-      </button>
+      </div>
       {expanded && skill.evidence && (
         <div className="mt-3 rounded-md bg-muted/50 p-2.5 text-xs leading-relaxed">
           <span className="font-medium text-muted-foreground">{he.cv.review.evidenceLabel}</span>{" "}

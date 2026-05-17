@@ -8,16 +8,26 @@ import { createPlan } from "@/lib/db/plans";
 import { getProfile } from "@/lib/db/profile";
 import { buildMatchingProfile } from "@/lib/matching/profile";
 import type { Ranking, Paths } from "@/lib/matching/types";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST() {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const internalUserId = await getOrCreateAnonymousUserId(user?.id);
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const internalUserId = await getOrCreateAnonymousUserId(user?.id);
 
+  try {
+    await requireConsent(internalUserId);
+  } catch (e) {
+    if (e instanceof NoConsentError) {
+      return Response.json({ error: "no_consent" }, { status: 403 });
+    }
+    throw e;
+  }
+
+  try {
     const svc = createServiceClient();
     const { data: rec } = await svc
       .from("recommendations")

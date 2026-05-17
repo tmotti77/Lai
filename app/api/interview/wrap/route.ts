@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/interview";
 import { runWrapRepairCall } from "@/lib/interview/tools";
 import { he } from "@/lib/i18n/he";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -27,6 +28,15 @@ export async function POST(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   const userId = await getOrCreateAnonymousUserId(user?.id);
+
+  try {
+    await requireConsent(userId);
+  } catch (e) {
+    if (e instanceof NoConsentError) {
+      return Response.json({ error: "no_consent" }, { status: 403 });
+    }
+    throw e;
+  }
 
   const session = await getInterviewSession(parsed.sessionId);
   if (!session) return Response.json({ error: "session_not_found" }, { status: 404 });

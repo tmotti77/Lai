@@ -6,6 +6,7 @@ import {
   type ToolSet,
   type StopCondition,
 } from "ai";
+import * as Sentry from "@sentry/nextjs";
 import { anthropic, MODEL_ID, extractAnthropicCacheUsage } from "@/lib/ai/client";
 import { checkUserMessage } from "@/lib/ai/safety";
 import { he } from "@/lib/i18n/he";
@@ -138,6 +139,10 @@ export async function streamLlmTurn(input: StreamLlmTurnInput): Promise<Response
       console.error(
         `[${contextLabel}] streamText error id=${contextId} error=${message}`,
       );
+      Sentry.captureException(error, {
+        tags: { context: contextLabel },
+        extra: { contextId },
+      });
       if (onError) {
         await onError(error).catch((secondary) =>
           console.error(

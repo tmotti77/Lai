@@ -78,7 +78,7 @@ export function CvDropZone({ onUpload }: { onUpload: (file: File) => void }) {
         onDragLeave={onDragLeave}
         aria-label={he.cv.upload.pickFile}
         className={[
-          "group block w-full rounded-2xl border-2 border-dashed p-10 text-center transition-[transform,border-color,background-color] duration-150",
+          "group block w-full rounded-2xl border-2 border-dashed p-10 text-center transition-[transform,border-color,background-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
           dragOver
             ? "scale-[1.01] border-primary bg-primary/5"
             : "border-border bg-card hover:border-primary/50 hover:bg-accent/5",

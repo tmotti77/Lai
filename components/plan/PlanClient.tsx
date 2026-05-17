@@ -37,7 +37,10 @@ export function PlanClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done }),
     });
-    if (!res.ok) throw new Error("toggle failed");
+    if (!res.ok) {
+      toast.error(he.plan.toggleError);
+      throw new Error("toggle failed");
+    }
     if (plan) {
       setPlan({
         ...plan,
@@ -63,16 +66,38 @@ export function PlanClient() {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">…</div>;
+  if (loading) {
+    return (
+      <div className="py-16 text-center text-muted-foreground">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-muted-foreground/50" aria-hidden />
+          {he.plan.loading}
+        </span>
+      </div>
+    );
+  }
 
   if (!plan) {
     return (
       <div className="space-y-6">
         <div className="rounded-xl border bg-card p-6 text-center">
-          <p className="mb-4 text-base text-muted-foreground">{he.plan.subtitle}</p>
-          <Button size="lg" onClick={() => generate(false)} disabled={generating}>
-            {generating ? he.plan.generating : he.plan.generate}
-          </Button>
+          {generating ? (
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-1.5" aria-label={he.plan.generating}>
+                <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:0ms]" aria-hidden />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:150ms]" aria-hidden />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:300ms]" aria-hidden />
+              </div>
+              <p className="text-sm text-muted-foreground">{he.plan.generating}</p>
+            </div>
+          ) : (
+            <>
+              <p className="mb-4 text-base text-muted-foreground">{he.plan.subtitle}</p>
+              <Button size="lg" onClick={() => generate(false)}>
+                {he.plan.generate}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );

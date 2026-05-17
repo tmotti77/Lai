@@ -21,7 +21,7 @@ export function PersonaSelector({
             type="button"
             onClick={() => onChangeAction(id)}
             aria-pressed={selected}
-            className={`rounded-xl border p-4 text-right transition-shadow ${
+            className={`rounded-xl border p-4 text-right transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
               selected ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card hover:shadow-sm"
             }`}
           >

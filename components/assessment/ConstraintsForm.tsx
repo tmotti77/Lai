@@ -22,6 +22,7 @@ export function ConstraintsForm() {
   const router = useRouter();
   const [form, setForm] = useState(initialState);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const labels = he.assessment.constraints.fields;
   const englishLabels = he.assessment.constraints.englishLevels;
 
@@ -29,9 +30,10 @@ export function ConstraintsForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
+    setSubmitError(null);
     const payload = ConstraintsSchema.safeParse({
       location_he: form.location_he,
       remote_ok: form.remote_ok,
@@ -45,6 +47,7 @@ export function ConstraintsForm() {
     });
     if (!payload.success) {
       toast.error(he.assessment.common.error);
+      setSubmitError(he.assessment.common.submitError);
       setSubmitting(false);
       return;
     }
@@ -56,6 +59,7 @@ export function ConstraintsForm() {
       });
       if (!res.ok) {
         toast.error(he.assessment.common.error);
+        setSubmitError(he.assessment.common.submitError);
         setSubmitting(false);
         return;
       }
@@ -63,6 +67,7 @@ export function ConstraintsForm() {
       router.push("/assessment");
     } catch {
       toast.error(he.assessment.common.error);
+      setSubmitError(he.assessment.common.submitError);
       setSubmitting(false);
     }
   };
@@ -155,6 +160,11 @@ export function ConstraintsForm() {
         </Field>
       )}
 
+      {submitError && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {submitError}
+        </div>
+      )}
       <Button type="submit" size="lg" disabled={submitting}>
         {submitting ? he.assessment.common.submitting : he.assessment.common.submit}
       </Button>

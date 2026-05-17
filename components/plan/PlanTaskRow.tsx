@@ -32,7 +32,7 @@ export function PlanTaskRow({ task, onToggle }: { task: PlanTask; onToggle: (don
         aria-label={done ? he.plan.completed : task.title_he}
         onClick={handleToggle}
         disabled={pending}
-        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
           done ? "border-primary bg-primary text-primary-foreground" : "border-input hover:border-primary"
         }`}
       >

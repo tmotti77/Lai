@@ -30,7 +30,13 @@ export function ChatShell() {
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <MessageList messages={messages} />
+          <MessageList
+            messages={messages}
+            isTyping={
+              isLoading &&
+              messages[messages.length - 1]?.role === "user"
+            }
+          />
         </div>
       )}
 

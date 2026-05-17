@@ -15,6 +15,7 @@ export function ValuesPicker() {
   const [picked, setPicked] = useState<string[]>([]);
   const [ranked, setRanked] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const togglePick = (id: string) => {
     setPicked((prev) =>
@@ -50,6 +51,7 @@ export function ValuesPicker() {
       return;
     }
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const res = await fetch("/api/assessment/submit", {
         method: "POST",
@@ -58,6 +60,7 @@ export function ValuesPicker() {
       });
       if (!res.ok) {
         toast.error(he.assessment.common.error);
+        setSubmitError(he.assessment.common.submitError);
         setSubmitting(false);
         return;
       }
@@ -65,6 +68,7 @@ export function ValuesPicker() {
       router.push("/assessment");
     } catch {
       toast.error(he.assessment.common.error);
+      setSubmitError(he.assessment.common.submitError);
       setSubmitting(false);
     }
   };
@@ -82,7 +86,7 @@ export function ValuesPicker() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => togglePick(opt.id)}
-                  className={`min-h-11 w-full rounded-lg border p-3 text-start transition-colors ${
+                  className={`min-h-11 w-full rounded-lg border p-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                     selected ? "border-primary bg-primary/5" : "border-input hover:bg-accent"
                   }`}
                 >
@@ -118,7 +122,7 @@ export function ValuesPicker() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => toggleRank(opt.id)}
-                className={`flex min-h-11 w-full items-center justify-between rounded-lg border p-3 transition-colors ${
+                className={`flex min-h-11 w-full items-center justify-between rounded-lg border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   selected ? "border-primary bg-primary/5" : "border-input hover:bg-accent"
                 }`}
               >
@@ -133,6 +137,11 @@ export function ValuesPicker() {
           );
         })}
       </ol>
+      {submitError && (
+        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {submitError}
+        </div>
+      )}
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => setStep("pick")}>
           {he.assessment.common.back}

@@ -3,8 +3,15 @@
 import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { MessageBubble } from "./MessageBubble";
+import { he } from "@/lib/i18n/he";
 
-export function MessageList({ messages }: { messages: UIMessage[] }) {
+export function MessageList({
+  messages,
+  isTyping = false,
+}: {
+  messages: UIMessage[];
+  isTyping?: boolean;
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Re-fire scroll on every text-content change, not just when a new message
@@ -26,7 +33,7 @@ export function MessageList({ messages }: { messages: UIMessage[] }) {
       bottomRef.current?.scrollIntoView({ block: "end", behavior: "instant" });
     });
     return () => cancelAnimationFrame(raf);
-  }, [messages.length, lastMessageTextLength]);
+  }, [messages.length, lastMessageTextLength, isTyping]);
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto px-4 py-6">
@@ -43,6 +50,15 @@ export function MessageList({ messages }: { messages: UIMessage[] }) {
           />
         );
       })}
+      {isTyping && (
+        <div className="flex w-full justify-end" aria-label={he.chat.thinking}>
+          <div className="flex items-center gap-1 rounded-2xl bg-muted px-4 py-3">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:0ms]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:150ms]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:300ms]" />
+          </div>
+        </div>
+      )}
       <div ref={bottomRef} />
     </div>
   );
