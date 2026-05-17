@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { toast } from "sonner";
@@ -50,6 +50,8 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
       : null,
   );
   const [successData, setSuccessData] = useState<{ count: number; archetype: string } | null>(null);
+  // Stable ref so onFinish can read the upload id without stale-closure risk.
+  const cvUploadIdRef = useRef<string>("");
 
   const { object, submit, isLoading } = useObject({
     api: "/api/cv/extract",
@@ -60,8 +62,15 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
         setPhase("idle");
         return;
       }
+      // Use the ref (not stale reviewData state) so the id is always current.
+      const uploadId = cvUploadIdRef.current;
+      if (!uploadId) {
+        toast.error(he.cv.errors.extractionFailed);
+        setPhase("idle");
+        return;
+      }
       setReviewData({
-        cvUploadId: reviewData?.cvUploadId ?? "",
+        cvUploadId: uploadId,
         reflectionHe: final.reflection_he,
         skills: final.skills,
         otherSkills: final.other_skills ?? [],
@@ -93,6 +102,8 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
         return;
       }
       const { id } = (await res.json()) as { id: string };
+      if (!id) throw new Error("upload returned no id");
+      cvUploadIdRef.current = id;
       setReviewData({ cvUploadId: id, reflectionHe: "", skills: [], otherSkills: [] });
       setPhase("reading");
       submit({ cv_upload_id: id });
@@ -103,7 +114,9 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
   };
 
   const handleConfirm = async (skillIds: string[]) => {
-    if (!reviewData) return;
+    // Defensive guard: button is disabled when cvUploadId is unset, but guard
+    // here too in case the component is invoked programmatically.
+    if (!reviewData?.cvUploadId) return;
     setPhase("saving");
     try {
       const res = await fetch("/api/cv/confirm", {
@@ -180,6 +193,7 @@ export function CvUploadClient({ initial }: { initial: InitialCvState | null }) 
         skills={reviewData.skills}
         otherSkills={reviewData.otherSkills}
         saving={phase === "saving"}
+        saveDisabled={!reviewData.cvUploadId}
         onSaveAction={handleConfirm}
         onCancelAction={handleReUpload}
       />

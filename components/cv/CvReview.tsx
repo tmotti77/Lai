@@ -49,6 +49,7 @@ export function CvReview({
   skills,
   otherSkills,
   saving,
+  saveDisabled,
   onSaveAction,
   onCancelAction,
 }: {
@@ -56,6 +57,8 @@ export function CvReview({
   skills: ExtractedSkill[];
   otherSkills: string[];
   saving: boolean;
+  /** Extra disabled flag for the save button, e.g. when cvUploadId is not yet set. */
+  saveDisabled?: boolean;
   onSaveAction: (skillIds: string[]) => void;
   onCancelAction: () => void;
 }) {
@@ -319,7 +322,7 @@ export function CvReview({
               <Button variant="ghost" onClick={onCancelAction} disabled={saving}>
                 {he.cv.review.cancel}
               </Button>
-              <Button onClick={() => onSaveAction(confirmed.map((s) => s.id))} disabled={saving || confirmed.length === 0}>
+              <Button onClick={() => onSaveAction(confirmed.map((s) => s.id))} disabled={saving || saveDisabled || confirmed.length === 0}>
                 {saving ? he.cv.review.saving : he.cv.review.save}
               </Button>
             </div>
