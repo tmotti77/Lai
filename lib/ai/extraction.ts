@@ -1,5 +1,5 @@
 import "server-only";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { anthropic, MODEL_ID } from "@/lib/ai/client";
 import { loadMessages } from "@/lib/db/queries";
@@ -93,14 +93,13 @@ export async function runExtraction(opts: {
     return null;
   }
 
-  const { object } = await generateObject({
+  const result = await generateText({
     model: anthropic(MODEL_ID),
     system: EXTRACTION_SYSTEM_PROMPT,
     prompt: buildExtractionUserPrompt(opts.stage, conversationText),
-    schema: ProfileSchema,
-    schemaName: "extract_profile",
-    schemaDescription: "Extracted profile data for this assessment stage.",
+    output: Output.object({ schema: ProfileSchema }),
   });
+  const object = result.output;
 
   await mergeProfileExtraction({
     userId: opts.userId,
