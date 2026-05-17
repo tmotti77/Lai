@@ -35,3 +35,40 @@ export async function hasActiveConsent(userId: string, purpose: ConsentPurpose):
     .maybeSingle();
   return Boolean(data);
 }
+
+export class NoConsentError extends Error {
+  constructor(public missing: string[]) {
+    super(`no_consent: missing ${missing.join(", ")}`);
+    this.name = "NoConsentError";
+  }
+}
+
+const DEFAULT_REQUIRED_PURPOSES: ReadonlyArray<ConsentPurpose> = [
+  "processing",
+  "disclaimer",
+] as const;
+
+/**
+ * Throws NoConsentError if the user is missing active consent for any
+ * required purpose. Resolves silently when all required consents are active.
+ *
+ * Call this at the top of any API route that mutates user data or sends
+ * data to third parties (LLM providers, etc.).
+ */
+export async function requireConsent(
+  userId: string,
+  purposes: ReadonlyArray<ConsentPurpose> = DEFAULT_REQUIRED_PURPOSES,
+): Promise<void> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from("consents")
+    .select("purpose, revoked_at")
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .in("purpose", purposes as readonly string[]);
+  if (error) throw new Error(`requireConsent: ${error.message}`);
+
+  const have = new Set((data ?? []).map((r) => r.purpose as string));
+  const missing = purposes.filter((p) => !have.has(p));
+  if (missing.length > 0) throw new NoConsentError(missing);
+}
