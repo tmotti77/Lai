@@ -3,9 +3,74 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { getCvUploadForUser, confirmCvUpload } from "@/lib/db/cv";
-import type { ProfileSkill } from "@/lib/cv/types";
+import type { ProfileSkill, SkillSource } from "@/lib/cv/types";
 import taxonomyJson from "@/content/skills/taxonomy.json";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+
+// ---------------------------------------------------------------------------
+// Exported helper (also used by tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the LATEST career_profile row for the user (ordered by updated_at desc),
+ * applies the first-CV-confirm archive rule, then updates ONLY that specific row
+ * by its id — not every row for the user.
+ *
+ * If no profile row exists yet, inserts a new one.
+ */
+export async function mergeCvSkillsIntoLatestProfile(
+  userId: string,
+  skills: Array<{ id: string; name_he: string; source: SkillSource; evidence?: string }>,
+): Promise<void> {
+  const svc = createServiceClient();
+
+  const { data: profile, error: readErr } = await svc
+    .from("career_profile")
+    .select("id, data")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readErr) throw new Error(`mergeCvSkillsIntoLatestProfile read: ${readErr.message}`);
+
+  if (!profile) {
+    // No profile yet — insert. conversation_id is unknown at this point; leave null.
+    const { error: insErr } = await svc.from("career_profile").insert({
+      user_id: userId,
+      data: { skills, skills_from_chat: [] },
+    });
+    if (insErr) throw new Error(`mergeCvSkillsIntoLatestProfile insert: ${insErr.message}`);
+    return;
+  }
+
+  const existing = (profile.data ?? {}) as {
+    skills?: unknown[];
+    skills_from_chat?: unknown[];
+    [key: string]: unknown;
+  };
+
+  // First-CV-confirm rule: if skills_from_chat is unset AND chat skills exist,
+  // archive them before replacing with CV skills.
+  const archive =
+    existing.skills_from_chat === undefined &&
+    Array.isArray(existing.skills) &&
+    existing.skills.length > 0
+      ? existing.skills
+      : (existing.skills_from_chat ?? []);
+
+  const mergedData = {
+    ...existing,
+    skills,
+    skills_from_chat: archive,
+  };
+
+  const { error: updErr } = await svc
+    .from("career_profile")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update({ data: mergedData as any })
+    .eq("id", profile.id); // ← scoped to THIS row, not all user rows
+  if (updErr) throw new Error(`mergeCvSkillsIntoLatestProfile update: ${updErr.message}`);
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -88,61 +153,11 @@ export async function POST(req: Request) {
     })
     .filter((s): s is ProfileSkill => s !== null);
 
-  const svc = createServiceClient();
-
-  // Latest conversation_id, if any, for the merge_career_profile call signature.
-  // CV confirms can happen pre-chat too; in that case we just upsert without it.
-  const { data: convs } = await svc
-    .from("conversations")
-    .select("id")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(1);
-  const conversationId = convs?.[0]?.id ?? null;
-
-  // Fetch current profile to archive existing chat skills on FIRST CV confirm.
-  const { data: existingProfile } = await svc
-    .from("career_profile")
-    .select("data")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const existingData = (existingProfile?.data ?? {}) as Record<string, unknown>;
-  const prevSkills = Array.isArray(existingData.skills)
-    ? (existingData.skills as unknown[])
-    : [];
-  const alreadyArchived = Array.isArray(existingData.skills_from_chat);
-
-  // First-CV-confirm: archive previous chat skills. Subsequent confirms just
-  // replace .skills — the latest CV is the source of truth.
-  const archive =
-    !alreadyArchived && prevSkills.length > 0
-      ? { skills_from_chat: prevSkills }
-      : {};
-
-  const newData = {
-    ...existingData,
-    ...archive,
-    skills: confirmedSkills as never,
-  };
-
-  // Direct upsert — same pattern as the merge RPC but without merging existing
-  // .skills (we're explicitly replacing it).
-  if (existingProfile) {
-    const { error } = await svc
-      .from("career_profile")
-      .update({ data: newData as never, conversation_id: conversationId })
-      .eq("user_id", userId);
-    if (error) {
-      return Response.json({ error: "profile_update_failed", message: error.message }, { status: 500 });
-    }
-  } else {
-    const { error } = await svc
-      .from("career_profile")
-      .insert({ user_id: userId, data: newData as never, conversation_id: conversationId });
-    if (error) {
-      return Response.json({ error: "profile_insert_failed", message: error.message }, { status: 500 });
-    }
+  try {
+    await mergeCvSkillsIntoLatestProfile(userId, confirmedSkills);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: "profile_update_failed", message }, { status: 500 });
   }
 
   try {
