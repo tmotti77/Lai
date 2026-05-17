@@ -18,6 +18,18 @@ export const CONSTRAINTS_PROMPT = `שלב נוכחי: אילוצים (constraint
 
 הסכן שאלות שגובלות בהפרת פרטיות (בריאות, יחסים) רק אם המשתמש מעלה אותן בעצמו.
 
+הנחיית חילוץ למערכת (חובה):
+כאשר שלב זה מסתיים ומופעל extract_profile, יש לפלט את האילוצים בפורמט הבא בדיוק:
+- english_level: אחד מהבאים בלבד: none | basic | intermediate | advanced | fluent
+  אם המשתמש ציין שפת-אם אנגלית — השתמש ב-"fluent", לא ב-"native".
+- risk_tolerance: מספר שלם 1–10 (שם השדה הוא risk_tolerance בלבד, לא risk_tolerance_1_10)
+- training_budget_nis: מספר שקלים (0–200,000), לא טקסט תיאורי
+- needs_immediate_income: true/false
+- months_until_income_required: מספר חודשים (0–36) — רק אם needs_immediate_income הוא false
+- remote_ok: true/false
+- time_per_week_hours: מספר שעות שבועיות (0–60)
+- location_he: שם עיר/אזור בעברית
+
 קריטריון מעבר ברור (חובה לציית):
 ברגע שיש לך לפחות 2 אילוצים מובהקים (זמן, תקציב, מיקום, או כל אחר) — **חובה לקרוא לכלי set_stage** עם next_stage: "wrap". אל תחפור עוד.
 
