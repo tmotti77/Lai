@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // pdf-parse v2 internally imports pdfjs-dist with a worker model that
@@ -7,4 +8,14 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN, // build-time only
+  silent: !process.env.CI,
+  widenClientFileUpload: false, // we have no client SDK
+  // Delete source maps from the build output after uploading to Sentry
+  // so they are never served to end users
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  webpack: { treeshake: { removeDebugLogging: true } },
+});
