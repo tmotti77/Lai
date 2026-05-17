@@ -30,6 +30,7 @@ export const he = {
       generic: "משהו השתבש. נסה שוב בעוד רגע.",
       rateLimit: "יותר מדי בקשות בזמן קצר. ננסה שוב בעוד דקה?",
     },
+    thinking: "CareerOS חושב…",
   },
   auth: {
     signInTitle: "התחברות / הרשמה",
