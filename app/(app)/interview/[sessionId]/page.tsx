@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { getInterviewSession, loadInterviewMessages } from "@/lib/db/interview";
 import { getUserFeedbackForTargets } from "@/lib/db/feedback";
+import { getNpsEligibility } from "@/lib/db/nps";
 import { InterviewChat } from "@/components/interview/InterviewChat";
 import { WrapUpScreen } from "@/components/interview/WrapUpScreen";
+import { NpsPrompt } from "@/components/feedback/NpsPrompt";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +28,20 @@ export default async function InterviewSessionPage({
   const messages = await loadInterviewMessages(session.id);
 
   if (session.completed_at) {
-    const thumbsMap = await getUserFeedbackForTargets(userId, [
-      { type: "interview_session", id: sessionId },
+    const [thumbsMap, eligibility] = await Promise.all([
+      getUserFeedbackForTargets(userId, [
+        { type: "interview_session", id: sessionId },
+      ]),
+      getNpsEligibility(userId),
     ]);
     const initialInterviewThumb =
       thumbsMap.get(`interview_session:${sessionId}`) ?? null;
 
     return (
       <div dir="rtl" className="mx-auto max-w-3xl space-y-6 p-6">
+        {eligibility.show && eligibility.trigger && (
+          <NpsPrompt trigger={eligibility.trigger} />
+        )}
         <WrapUpScreen
           session={session}
           messages={messages}
