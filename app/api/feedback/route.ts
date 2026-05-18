@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { requireConsent, NoConsentError } from "@/lib/consent";
 import { createServiceClient } from "@/lib/supabase/service";
-import { track } from "@/lib/analytics";
+import { track, npsBucket } from "@/lib/analytics";
 import { loadAllOccupations } from "@/lib/db/occupations";
 import * as Sentry from "@sentry/nextjs";
 
@@ -135,8 +135,30 @@ export async function POST(req: NextRequest) {
         });
       }
     } else {
-      // NPS path — handled in Task 9
-      return NextResponse.json({ error: "not_implemented" }, { status: 501 });
+      // NPS — append-only, guarded by feedback_one_nps_per_user_idx
+      const { error } = await supabase.from("feedback").insert({
+        user_id: userId,
+        surface: "nps",
+        nps_score: body.nps_score,
+        nps_trigger: body.nps_trigger,
+        comment_he: body.comment_he ?? null,
+      });
+      if (error && (error as { code?: string }).code === "23505") {
+        return NextResponse.json({ ok: true, already: true });
+      }
+      if (error) throw error;
+
+      await supabase
+        .from("users")
+        .update({ nps_submitted_at: new Date().toISOString() })
+        .eq("id", userId)
+        .is("nps_submitted_at", null);
+
+      track("feedback_submitted", {
+        kind: "nps",
+        trigger: body.nps_trigger,
+        bucket: npsBucket(body.nps_score),
+      });
     }
 
     return NextResponse.json({ ok: true });

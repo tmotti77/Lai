@@ -50,6 +50,7 @@ vi.mock("@/lib/anonymous", () => ({
 import { POST } from "@/app/api/feedback/route";
 import { track } from "@/lib/analytics";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function makeReq(body: unknown): Promise<Request> {
   return new Request("http://test/api/feedback", {
@@ -159,6 +160,48 @@ describe.skipIf(!HAS_REAL_DB)(
           thumbs_value: 1,
         }) as never);
         expect(res.status).toBe(404);
+      } finally {
+        await cleanup(userId);
+      }
+    });
+  },
+);
+
+describe.skipIf(!HAS_REAL_DB)(
+  "POST /api/feedback — NPS path (integration, requires real Supabase)",
+  () => {
+    it("first NPS submit writes a row and marks users.nps_submitted_at", async () => {
+      const { userId } = await setupTestUser();
+      try {
+        (getOrCreateAnonymousUserId as ReturnType<typeof vi.fn>).mockResolvedValue(userId);
+        const res = await POST(await makeReq({
+          kind: "nps", nps_score: 9, nps_trigger: "pdf_download", comment_he: "מצוין",
+        }) as never);
+        expect(res.status).toBe(200);
+        const supabase = createServiceClient();
+        const { data: rows } = await supabase.from("feedback").select("*").eq("user_id", userId);
+        expect(rows).toHaveLength(1);
+        expect(rows![0].nps_score).toBe(9);
+        const { data: user } = await supabase.from("users").select("nps_submitted_at").eq("id", userId).single();
+        expect(user!.nps_submitted_at).not.toBeNull();
+      } finally {
+        await cleanup(userId);
+      }
+    });
+
+    it("double-submit returns idempotent {ok, already: true} (unique index)", async () => {
+      const { userId } = await setupTestUser();
+      try {
+        (getOrCreateAnonymousUserId as ReturnType<typeof vi.fn>).mockResolvedValue(userId);
+        await POST(await makeReq({
+          kind: "nps", nps_score: 9, nps_trigger: "pdf_download",
+        }) as never);
+        const res2 = await POST(await makeReq({
+          kind: "nps", nps_score: 5, nps_trigger: "pdf_download",
+        }) as never);
+        const body = await res2.json();
+        expect(res2.status).toBe(200);
+        expect(body.already).toBe(true);
       } finally {
         await cleanup(userId);
       }
