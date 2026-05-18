@@ -31,7 +31,8 @@ describe("escapeCsv", () => {
     expect(escapeCsv("@user")).toBe("'@user");
   });
 
-  it("serializes objects as JSON", () => {
-    expect(escapeCsv({ a: 1 })).toBe('{"a":1}');
+  it("serializes objects as JSON with CSV escaping", () => {
+    // JSON.stringify({ a: 1 }) === '{"a":1}' — contains quotes, so CSV-escapes
+    expect(escapeCsv({ a: 1 })).toBe('"{""a"":1}"');
   });
 });

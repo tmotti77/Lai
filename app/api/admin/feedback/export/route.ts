@@ -11,8 +11,8 @@ const FORMULA_INJECTION = /^[=+\-@\t\r]/;
 
 export function escapeCsv(v: unknown): string {
   if (v == null) return "";
-  if (typeof v !== "string") return JSON.stringify(v);
-  const safe = FORMULA_INJECTION.test(v) ? `'${v}` : v;
+  const raw = typeof v === "string" ? v : JSON.stringify(v);
+  const safe = FORMULA_INJECTION.test(raw) ? `'${raw}` : raw;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
