@@ -58,4 +58,30 @@ describe("FeedbackBody (Zod discriminated union)", () => {
       comment_he: "x".repeat(1001),
     })).toThrow();
   });
+
+  it("preserves metadata field even with .strict()", () => {
+    const result = FeedbackBody.parse({
+      kind: "thumb",
+      surface: "recommendations",
+      target_type: "recommendation_occupation",
+      target_id: "abc:data-analyst",
+      thumbs_value: 1,
+      metadata: { context: "path_safe", rank: 2 },
+    });
+    expect(result.kind).toBe("thumb");
+    if (result.kind === "thumb") {
+      expect(result.metadata).toEqual({ context: "path_safe", rank: 2 });
+    }
+  });
+
+  it("rejects extra unknown fields on thumb via .strict()", () => {
+    expect(() => FeedbackBody.parse({
+      kind: "thumb",
+      surface: "recommendations",
+      target_type: "recommendation_occupation",
+      target_id: "abc:data-analyst",
+      thumbs_value: 1,
+      unknownField: "should fail",
+    })).toThrow();
+  });
 });
