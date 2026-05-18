@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { he } from "@/lib/i18n/he";
 import { Button } from "@/components/ui/button";
+import { ThumbsRow } from "@/components/feedback/ThumbsRow";
 import type {
   InterviewSession,
   InterviewMessageRow,
@@ -12,9 +13,11 @@ import { InterviewMessage } from "./InterviewMessage";
 export function WrapUpScreen({
   session,
   messages,
+  initialThumb,
 }: {
   session: InterviewSession;
   messages: InterviewMessageRow[];
+  initialThumb: -1 | 1 | null;
 }) {
   const visible = messages.filter(
     (m) => m.role === "user" || m.role === "assistant",
@@ -102,6 +105,15 @@ export function WrapUpScreen({
             </ol>
           </section>
         )}
+
+      <div className="mt-6">
+        <ThumbsRow
+          surface="interview"
+          targetType="interview_session"
+          targetId={session.id}
+          initialValue={initialThumb}
+        />
+      </div>
 
       <details className="rounded-lg border bg-muted/30 p-4">
         <summary className="cursor-pointer text-sm font-medium">
