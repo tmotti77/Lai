@@ -1,5 +1,6 @@
 import { he } from "@/lib/i18n/he";
 import { ScoreBreakdown } from "./ScoreBreakdown";
+import { ThumbsRow } from "@/components/feedback/ThumbsRow";
 import type { Ranking, Occupation } from "@/lib/matching/types";
 
 export function PathCard({
@@ -8,12 +9,16 @@ export function PathCard({
   ranking,
   occupation,
   prose,
+  recommendationId,
+  initialThumb,
 }: {
   pathLabel: string;
   pathDescription: string;
   ranking: Ranking;
   occupation: Occupation;
   prose?: string;
+  recommendationId: string;
+  initialThumb: -1 | 1 | null;
 }) {
   const market = he.recommendations.market;
   const demandLabels = he.recommendations.demandLabels;
@@ -54,6 +59,15 @@ export function PathCard({
         </div>
       </dl>
       <ScoreBreakdown breakdown={ranking.breakdown} />
+      <div className="mt-2 flex items-center justify-start">
+        <ThumbsRow
+          surface="recommendations"
+          targetType="recommendation_occupation"
+          targetId={`${recommendationId}:${occupation.id}`}
+          initialValue={initialThumb}
+          metadata={{ recommendation_id: recommendationId }}
+        />
+      </div>
     </article>
   );
 }

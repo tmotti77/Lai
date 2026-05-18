@@ -15,6 +15,8 @@ type ApiResponse = {
   prose: Record<string, string>;
   cached: boolean;
   generated_at?: string;
+  recommendation_id: string;
+  thumbs: Record<string, -1 | 1>;
   error?: string;
 };
 
@@ -142,6 +144,8 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
         paths={data.paths}
         occupations={occupations}
         prose={data.prose}
+        recommendationId={data.recommendation_id}
+        thumbsMap={data.thumbs}
       />
     </div>
   );
