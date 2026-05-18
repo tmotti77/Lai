@@ -291,6 +291,59 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          comment_he: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          nps_score: number | null
+          nps_trigger: string | null
+          surface: string
+          target_id: string | null
+          target_type: string | null
+          thumbs_value: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_he?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          nps_score?: number | null
+          nps_trigger?: string | null
+          surface: string
+          target_id?: string | null
+          target_type?: string | null
+          thumbs_value?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment_he?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          nps_score?: number | null
+          nps_trigger?: string | null
+          surface?: string
+          target_id?: string | null
+          target_type?: string | null
+          thumbs_value?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interview_messages: {
         Row: {
           cache_read_tokens: number | null
@@ -654,8 +707,13 @@ export type Database = {
           deletion_requested_at: string | null
           display_name: string | null
           email: string | null
+          first_report_downloaded_at: string | null
           id: string
           is_anonymous: boolean
+          nps_dismissed_at: string | null
+          nps_eligibility_first_at: string | null
+          nps_submitted_at: string | null
+          nps_trigger_first: string | null
           updated_at: string
         }
         Insert: {
@@ -668,8 +726,13 @@ export type Database = {
           deletion_requested_at?: string | null
           display_name?: string | null
           email?: string | null
+          first_report_downloaded_at?: string | null
           id?: string
           is_anonymous?: boolean
+          nps_dismissed_at?: string | null
+          nps_eligibility_first_at?: string | null
+          nps_submitted_at?: string | null
+          nps_trigger_first?: string | null
           updated_at?: string
         }
         Update: {
@@ -682,8 +745,13 @@ export type Database = {
           deletion_requested_at?: string | null
           display_name?: string | null
           email?: string | null
+          first_report_downloaded_at?: string | null
           id?: string
           is_anonymous?: boolean
+          nps_dismissed_at?: string | null
+          nps_eligibility_first_at?: string | null
+          nps_submitted_at?: string | null
+          nps_trigger_first?: string | null
           updated_at?: string
         }
         Relationships: []
