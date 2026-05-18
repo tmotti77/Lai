@@ -21,6 +21,7 @@ import type { Occupation } from "@/lib/matching/types";
 import taxonomy from "@/content/skills/taxonomy.json";
 import { he } from "@/lib/i18n/he";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -109,6 +110,7 @@ export async function POST(req: Request): Promise<Response> {
       targetOccupationId,
       targetRoleHe,
     });
+    track("interview_started", { persona: body.persona });
     return Response.json({ sessionId: session.id });
   }
 
