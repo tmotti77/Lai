@@ -6,6 +6,8 @@ import { getCvUploadForUser, confirmCvUpload } from "@/lib/db/cv";
 import type { ProfileSkill, SkillSource } from "@/lib/cv/types";
 import taxonomyJson from "@/content/skills/taxonomy.json";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track, skillCountBucket } from "@/lib/analytics";
+import { inferArchetype } from "@/lib/cv/archetype";
 
 // ---------------------------------------------------------------------------
 // Exported helper (also used by tests)
@@ -159,6 +161,15 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: "profile_update_failed", message }, { status: 500 });
   }
+
+  const skillCategories = confirmedSkills
+    .map((s) => TAXONOMY.get(s.id)?.category)
+    .filter((c): c is string => c !== undefined);
+  const archetype = inferArchetype(skillCategories);
+  track("cv_uploaded", {
+    skill_count_bucket: skillCountBucket(confirmedSkills.length),
+    archetype,
+  });
 
   try {
     await confirmCvUpload({ id: upload.id, userId });
