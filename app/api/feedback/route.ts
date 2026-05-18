@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
       if (body.thumbs_value === null) {
         if (existing) {
           await supabase.from("feedback").delete().eq("id", existing.id);
+          track("feedback_submitted", { kind: "thumb", surface: body.surface, value: "removed" });
         }
-        track("feedback_submitted", { kind: "thumb", surface: body.surface, value: "removed" });
       } else if (existing) {
         await supabase
           .from("feedback")
