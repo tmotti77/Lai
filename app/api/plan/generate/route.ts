@@ -9,6 +9,8 @@ import { getProfile } from "@/lib/db/profile";
 import { buildMatchingProfile } from "@/lib/matching/profile";
 import type { Ranking, Paths } from "@/lib/matching/types";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track } from "@/lib/analytics";
+import { markNpsEligibilityIfFirst } from "@/lib/db/nps";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -102,6 +104,9 @@ export async function POST() {
       archetype,
       tasks,
     });
+
+    track("plan_generated", { archetype });
+    await markNpsEligibilityIfFirst(internalUserId, "plan_generated");
 
     return Response.json(plan);
   } catch (err) {
