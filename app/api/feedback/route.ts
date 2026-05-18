@@ -148,11 +148,16 @@ export async function POST(req: NextRequest) {
       }
       if (error) throw error;
 
-      await supabase
+      const { error: updateErr } = await supabase
         .from("users")
         .update({ nps_submitted_at: new Date().toISOString() })
         .eq("id", userId)
         .is("nps_submitted_at", null);
+      if (updateErr) {
+        Sentry.captureException(updateErr, {
+          tags: { route: "POST /api/feedback", kind: "nps_flag" },
+        });
+      }
 
       track("feedback_submitted", {
         kind: "nps",

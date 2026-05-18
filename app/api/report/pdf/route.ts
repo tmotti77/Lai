@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 import { loadReportData } from "@/lib/pdf/loadReportData";
 import { renderReport } from "@/lib/pdf/render";
 import { track } from "@/lib/analytics";
@@ -14,6 +15,15 @@ export async function GET() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const internalUserId = await getOrCreateAnonymousUserId(user?.id);
+
+    try {
+      await requireConsent(internalUserId);
+    } catch (err) {
+      if (err instanceof NoConsentError) {
+        return Response.json({ error: "consent_required" }, { status: 403 });
+      }
+      throw err;
+    }
 
     const data = await loadReportData(internalUserId);
     if (!data) {
