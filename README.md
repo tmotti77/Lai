@@ -22,6 +22,16 @@ npm run db:types     # regenerate Supabase types (requires `supabase login` + `s
 npx tsc --noEmit     # type check
 ```
 
+## Environment variables
+
+- `ANTHROPIC_API_KEY` (required): API key for Anthropic Claude. Get from [console.anthropic.com](https://console.anthropic.com).
+- `ANTHROPIC_MODEL` (required): Claude model ID (e.g., `claude-sonnet-4-5-20250929`). Verify current ID at https://docs.anthropic.com/en/docs/about-claude/models.
+- `SUPABASE_SERVICE_ROLE_KEY` (required in production): Service role key for server-side database access. Get from Supabase Dashboard → Project Settings → API.
+- `NEXT_PUBLIC_SUPABASE_URL` (required): Supabase project URL (https://your-project.supabase.co).
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (required): Supabase anon key for public client use. Get from Supabase Dashboard → Project Settings → API.
+- `NEXT_PUBLIC_SITE_URL` (required): Public site URL (http://localhost:3000 in dev).
+- `ADMIN_EXPORT_TOKEN` (optional, recommended for production): Bearer token for the admin feedback CSV export endpoint. Generate with `openssl rand -hex 32`. Without this set, `GET /api/admin/feedback/export` always returns 401.
+
 ## Database migrations
 
 Migrations live in `supabase/migrations/<timestamp>_<name>.sql` and are git-tracked source of truth. To apply:

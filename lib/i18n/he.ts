@@ -346,6 +346,24 @@ export const he = {
       noFile: "לא נבחר קובץ.",
     },
   },
+  feedback: {
+    thumbs: {
+      upLabel: "תגובה חיובית",
+      downLabel: "תגובה שלילית",
+    },
+    nps: {
+      title: "?כמה סביר שתמליצ/י על השירות לחבר/ה",
+      subtitle: "התשובה שלך עוזרת לנו לשפר את המוצר. ניתן לדלג.",
+      scaleLabel: "דירוג מ-0 עד 10",
+      scaleMin: "בכלל לא סביר",
+      scaleMax: "סביר מאוד",
+      commentPlaceholder: "מה גרם לך לבחור את הציון הזה? (אופציונלי)",
+      submitButton: "שליחה",
+      submitting: "שולח...",
+      skipButton: "דלג",
+      dismissLabel: "סגירה",
+    },
+  },
   interview: {
     landing: {
       title: "סימולטור ראיונות",
