@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Heebo } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
         {children}
         <Toaster position="top-center" dir="rtl" />
+        <Analytics />
       </body>
     </html>
   );
