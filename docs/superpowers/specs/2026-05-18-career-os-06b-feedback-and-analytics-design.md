@@ -11,7 +11,7 @@
 
 Add the quality-signal and aggregate-funnel telemetry that the product currently lacks:
 
-1. **Per-message thumbs feedback** on the three highest-signal AI-generated surfaces (chat / recommendations / interview). Skip plan-task thumbs — task-completion analytics events carry that signal more reliably.
+1. **Per-message thumbs feedback** on two AI-generated surfaces: **recommendations** (per-occupation prose) and **interview wrap-up feedback**. Chat thumbs are explicitly **deferred to Phase 6b.5** — see §2 decision #14 for the rationale (current `MessageList` receives client-generated AI SDK `UIMessage[]` ids, not persisted `messages.id` — wiring those through requires a streaming-protocol change that's out of scope here).
 2. **One-shot NPS prompt** triggered by the first value-delivery moment per user (PDF download / plan generated / interview completed), persisting `nps_eligibility_first_at` server-side.
 3. **`feedback` table** in Supabase: single source of truth for thumbs + NPS rows. Token-gated CSV export endpoint for weekly admin review.
 4. **Vercel Analytics events** for the master-roadmap §22 funnel + product-quality signals. Wrapped in `lib/analytics.ts` with a typed allowlist; **never** sends user identifiers, free text, or Hebrew strings.
@@ -33,9 +33,11 @@ The cross-cutting privacy constraint: **rich per-user analysis = Supabase joins 
 | 7 | Per-user identifiers in Vercel Analytics | **None — not even salted hash** | Even pseudonymous IDs become a covert linking key if Vercel data ever exports / leaks. Per-user funnel = Supabase joins on existing tables. Vercel = pure aggregate counters. |
 | 8 | Generic track endpoint | **Do not build one** | Server-side `track()` called directly from the API route that produces the event. A client-facing `/api/analytics/track` is a PII firehose risk and unnecessary — `<Analytics />` autotracks pageviews. |
 | 9 | Admin export shape | **`GET /api/admin/feedback/export?since=...&surface=...` with Bearer-token auth, capped CSV response (10k rows), no UI** | Boring + sufficient for Phase 6b weekly review. Future admin UI is a separate phase. `crypto.timingSafeEqual` on buffer (not string-length) for token comparison. CSV formula-injection escape. `x-content-type-options: nosniff`. |
-| 10 | Target ownership validation | **For `message` and `interview_session`: verify the row belongs to the user before INSERT/UPDATE. For `recommendation_occupation`: skip (catalog string)** | Prevents thumbs-pollution attacks on quality metrics. First-party-table targets get cheap ownership check; content-derived IDs are validated only by the enum CHECK + length. |
+| 10 | Target ownership validation | **For `interview_session`: verify the row belongs to the user before INSERT/UPDATE. For `recommendation_occupation`: skip (composite catalog string, see #13)** | Prevents thumbs-pollution attacks on quality metrics. First-party-table targets get cheap ownership check; content-derived IDs are validated only by the enum CHECK + length. `message` target_type defined but unused in Phase 6b — see #14. |
 | 11 | Analytics-emission idempotency | **Guarded UPDATE with RETURNING; event fires only when row actually transitions state** | Applies to `is_first` for report download, NPS eligibility, NPS dismissal, interview completion, plan task transition. No race window, no double-emit. PostgreSQL atomic by construction. |
 | 12 | `account_saved` event | **Drop for Phase 6b** | `exchangeCodeForSession` doesn't tell us whether an anon→auth promotion occurred. Emitting on every sign-in produces wrong data. §22 "save report (auth)" metric is still derivable via SQL on `users.is_anonymous` flip. Add the event later when `lib/anonymous.ts` exposes promotion result. |
+| 13 | Recommendation thumb target_id semantics | **Composite `${recommendation_id}:${occupation_id}`**; one thumb per (user, recommendation_id, occupation_id), NOT per (user, occupation_id) globally | Recommendation prose CHANGES across regens (different `profile_hash`, different scores, different Hebrew prose). User's intent is "I liked THIS prose," not "I like data-analyst as an occupation forever." `recommendation_id` MUST be added to `/api/recommendations` response payload so the client knows it. |
+| 14 | Chat thumbs in Phase 6b | **Deferred to Phase 6b.5** | Current `MessageList` receives client-generated AI SDK `UIMessage[].id`, not persisted `messages.id`. Wiring requires `streamText({ messageMetadata })` to ride persisted ID back through the stream, plus a `Map<ai-sdk-id, db-id>` on the client. That protocol change is meaningful surface — defer to 6b.5. The `'message'` target_type is included in the schema enum so the schema doesn't need migration when 6b.5 lands, but no chat UI mounts `<ThumbsRow>` in 6b. |
 
 ---
 
@@ -47,7 +49,7 @@ The cross-cutting privacy constraint: **rich per-user analysis = Supabase joins 
 lib/analytics.ts                                     Typed track() wrapper, EventName/EventPropsMap, after()
 lib/db/feedback.ts                                   getUserFeedbackForTargets() for SSR hydration
 lib/db/nps.ts                                        getNpsEligibility(userId), markNpsEligibilityIfFirst()
-components/feedback/ThumbsRow.tsx                    Client component (chat / recs / interview)
+components/feedback/ThumbsRow.tsx                    Client component (recs + interview; chat deferred to 6b.5)
 components/feedback/NpsPrompt.tsx                    Client component (recommendations / plan / interview)
 
 app/api/feedback/route.ts                            POST: thumbs + NPS submit (discriminated union body)
@@ -74,15 +76,17 @@ tests/integration/plan-task-transition.test.ts       false→true emits; true→
 app/layout.tsx                                       Add <Analytics /> from @vercel/analytics/next
 lib/i18n/he.ts                                       New `feedback.*` namespace (thumbs labels, NPS strings)
 
-app/(app)/chat/page.tsx                              SSR hydrate ThumbsRow initial values
-components/chat/MessageList.tsx                      Mount <ThumbsRow> below assistant messages (skip safety-flagged)
-components/recommendations/OccupationCard.tsx        Mount <ThumbsRow> bottom-left of each top-5 card
+components/recommendations/OccupationCard.tsx        Mount <ThumbsRow> bottom-left of each top-5 card (composite target_id includes recommendation_id from API response)
 components/interview/WrapUpScreen.tsx                Mount <ThumbsRow> at bottom of wrap-up feedback
-app/(app)/recommendations/page.tsx                   Render <NpsPrompt> when eligibility.show
+app/(app)/recommendations/page.tsx                   SSR-render <NpsPrompt> when eligibility.show
 app/(app)/plan/page.tsx                              Same
 app/(app)/interview/[sessionId]/page.tsx             Same
+components/recommendations/RecommendationsClient.tsx Read thumbs initial state from API response (NOT separate SSR query)
 
 app/api/chat/route.ts                                Emit conversation_started on first user message
+app/api/recommendations/route.ts                     Add recommendation_id + thumbs map to response payload (see §10)
+package.json / package-lock.json                     Add @vercel/analytics dependency
+README.md                                            Document ADMIN_EXPORT_TOKEN env var alongside existing Vercel env vars
 app/api/assessment/submit/route.ts                   Emit assessment_completed
 app/api/cv/confirm/route.ts                          Emit cv_uploaded (call inferArchetype)
 app/api/recommendations/route.ts                     Emit recommendations_generated
@@ -101,7 +105,10 @@ scripts/verify-all-surfaces.mjs                      Add thumbs/NPS interaction 
 
 - `lib/env.ts` — `ADMIN_EXPORT_TOKEN` is not required in dev/build; missing → 401 from admin route only
 - `lib/anonymous.ts` — promotion path NOT modified for `account_saved` (deferred)
+- `components/chat/MessageList.tsx` — chat thumbs deferred to Phase 6b.5 (see §2 decision #14)
+- `app/(app)/chat/page.tsx` — same reason
 - Matching engine, AI prompts, assessment scoring — no behavioral changes
+- AI SDK streaming protocol — Phase 6b.5 will add `messageMetadata` carrying persisted DB ids for chat thumbs; not touched in 6b
 
 ---
 
@@ -277,7 +284,7 @@ export function npsBucket(score: number): NpsBucket {
 
 ## 6. Thumbs UI (`<ThumbsRow>`)
 
-Reusable client component mounted at three sites with `(surface, target_type, target_id)`-shaped props plus optional `metadata`. `initialValue` hydrated server-side via `getUserFeedbackForTargets(userId, targets)` (single query per page returning a `Map<targetId, -1|1>`).
+Reusable client component mounted at two sites with `(surface, target_type, target_id)`-shaped props plus optional `metadata`. `initialValue` hydration strategy differs per surface — see below.
 
 UX semantics: click same vote = un-vote (DELETE); click opposite = flip (UPDATE); first click = INSERT. Optimistic UI with silent rollback on network failure; Sentry+console logging on error but no toast.
 
@@ -285,13 +292,14 @@ Visual: filled icon (`fill-current`) when selected, outline when not — selecte
 
 Insertion points:
 
-| Surface | File | target_type | target_id | metadata |
+| Surface | File | target_type | target_id | Hydration |
 |---|---|---|---|---|
-| Chat | `components/chat/MessageList.tsx` | `message` | `messages.id` | — |
-| Recommendations | `components/recommendations/OccupationCard.tsx` | `recommendation_occupation` | catalog `occupation_id` | `{recommendation_id}` |
-| Interview wrap | `components/interview/WrapUpScreen.tsx` | `interview_session` | `interview_sessions.id` | — |
+| Recommendations | `components/recommendations/OccupationCard.tsx` | `recommendation_occupation` | `${recommendation_id}:${occupation_id}` | Initial values returned inline by `/api/recommendations` response (see §10) — no separate query. RecommendationsClient passes the per-card `initialValue` from `data.thumbs[id]`. |
+| Interview wrap | `components/interview/WrapUpScreen.tsx` | `interview_session` | `interview_sessions.id` | SSR via `getUserFeedbackForTargets(userId, [{type: 'interview_session', id: sessionId}])` in the server component for `/interview/[sessionId]/page.tsx` since interview-wrap data is already server-rendered. One `Map`-returning helper in `lib/db/feedback.ts`. |
 
-Safety-fallback chat messages (where `messages.safety_flag IS NOT NULL`) do NOT mount `<ThumbsRow>` — the row is filtered out in MessageList before mapping.
+**Why two hydration patterns:** because the two surfaces have different data-loading shapes. Recommendations fetch client-side via `useEffect`; the cheapest "initial thumbs state" comes inline with that fetch's response. Interview wrap is server-rendered with session data already available; the SSR helper avoids a second client roundtrip.
+
+**Chat thumbs deferred to 6b.5 — see §2 decision #14.**
 
 ---
 
@@ -365,7 +373,10 @@ const FeedbackBody = z.discriminatedUnion("kind", [ThumbBody, NpsBody]);
 
 Thumb flow:
 
-1. Validate target ownership for `message` (JOIN `conversations.user_id`) and `interview_session` (`user_id` direct). Skip for `recommendation_occupation`. Return 404 on miss.
+1. Validate target ownership:
+   - `interview_session`: query `interview_sessions` for `id = target_id AND user_id = userId` — 404 on miss
+   - `recommendation_occupation`: split `target_id` on `:` → `[recommendation_id, occupation_id]`; verify `recommendations.id = recommendation_id AND user_id = userId`; verify `occupation_id` is in the catalog string set — 404 on miss
+   - `message`: target_type is defined in the enum but no UI emits this in Phase 6b; route accepts it but the chat thumb feature is unwired. Implementation should still validate `messages.id` ownership when called, since Phase 6b.5 wiring is the only consumer
 2. SELECT current vote for `(user_id, surface, target_type, target_id) WHERE thumbs_value IS NOT NULL`.
 3. If `existing.thumbs_value === incoming.thumbs_value`: no-op short-circuit, return `{ok, unchanged: true}`. No DB write. No event.
 4. Else if `incoming === null`: DELETE the existing row. Emit `feedback_submitted` with `value: "removed"`.
@@ -420,7 +431,43 @@ curl -H "Authorization: Bearer $ADMIN_EXPORT_TOKEN" \
 
 ---
 
-## 10. Event-wiring details
+## 10. `/api/recommendations` response shape change
+
+Add two fields to the existing response shape so the client can render thumbs without an extra fetch:
+
+```typescript
+// app/api/recommendations/route.ts response (Phase 6b additions in bold)
+{
+  rankings: [...],
+  paths: {...},
+  prose: {...},
+  cached: boolean,
+  generated_at: string,
+  // ↓ Phase 6b additions
+  recommendation_id: string,                   // the recommendations.id row used (cached or fresh)
+  thumbs: Record<string, -1 | 1>,              // map of "${recommendation_id}:${occupation_id}" → user's current vote, omitting unvoted
+}
+```
+
+`thumbs` populated via a single query inside `/api/recommendations/route.ts`:
+
+```typescript
+const { data: thumbsRows } = await supabase
+  .from("feedback")
+  .select("target_id, thumbs_value")
+  .eq("user_id", userId)
+  .eq("surface", "recommendations")
+  .eq("target_type", "recommendation_occupation")
+  .like("target_id", `${recommendationId}:%`)
+  .not("thumbs_value", "is", null);
+const thumbs = Object.fromEntries(
+  (thumbsRows ?? []).map((r) => [r.target_id, r.thumbs_value])
+);
+```
+
+`RecommendationsClient` reads `data.thumbs[target_id]` per occupation card and passes as `initialValue` to `<ThumbsRow>`. No second roundtrip.
+
+## 11. Event-wiring details
 
 **Atomic `is_first` for `report_downloaded`:**
 ```typescript
@@ -509,7 +556,7 @@ Common pattern across all event-wired routes: guarded UPDATE with RETURNING; eve
 
 ---
 
-## 11. i18n (`lib/i18n/he.ts`)
+## 12. i18n (`lib/i18n/he.ts`)
 
 ```typescript
 feedback: {
@@ -536,7 +583,7 @@ Hebrew strings are v1 — same caveat as Phase 3a assessment items: a Hebrew cop
 
 ---
 
-## 12. Testing strategy
+## 13. Testing strategy
 
 **Layer 1 — Unit (Vitest, no DB, no fetch):**
 - `npsBucket(score)` boundaries: 0, 6, 7, 8, 9, 10. Invalid (-1, 11) are rejected by Zod at the route layer, not the helper.
@@ -552,16 +599,21 @@ Hebrew strings are v1 — same caveat as Phase 3a assessment items: a Hebrew cop
 - `toggleTaskDone`: false→true emits with correct props; true→true no-op; false→false no-op; cross-user attempt returns 403
 
 **Layer 3 — E2E + a11y (Playwright + axe-core, extend `scripts/verify-all-surfaces.mjs`):**
-- Add thumbs interaction tests on chat / recommendations / interview-wrap (`getByRole("button", { pressed: true })`)
+- Add thumbs interaction tests on recommendations / interview-wrap (`getByRole("button", { pressed: true })`)
 - Add NPS prompt rendering (force eligibility via service-role SQL fixture, reload, verify radiogroup mounts, fill score, submit)
 - Add admin-export surface (Bearer header — never `?token=` query)
 - Verify all new components: 0 critical/serious axe violations across 375 / 768 / 1280 viewports
 
-**Mocking discipline (key for integration tests):** Tests mock `@/lib/analytics`, NOT `@vercel/analytics/server` directly. This keeps tests independent of `after()` runtime behavior and Vercel-platform detection — testing the boundary we own, not the boundary the vendor owns.
+**Mocking discipline (different rules per test layer):**
+
+- **Route / integration tests mock `@/lib/analytics`.** This isolates the route's decision logic — "did this route decide to emit the correct event at the correct time?" — from `after()`, `@vercel/analytics/server`, and the wrapper's internals. Mocking the wrapper does NOT exercise the layers beneath it; that's deliberate. The route's job is to call `track()` correctly; the wrapper's job is to deliver the event correctly. These are different units of work and get different tests.
+- **DB-backed integration tests use the real test database, not mocked Supabase.** The bugs we're guarding against in Phase 6b — partial unique indexes, guarded UPDATEs with RETURNING, ownership-check JOINs, unique constraint behavior, atomic eligibility marking — only manifest against PostgreSQL. A mocked Supabase chain can lie about constraint violations or fake "affected rows" return values. The integration tests are the source of truth for these invariants.
+- **`lib/analytics.ts` is unit-tested separately with `@vercel/analytics/server` mocked.** That's where `track()`'s use of `after()`, error-swallowing, test-env noop, and `npsBucket()` boundaries are verified.
+- **Unit tests for "guarded UPDATE emits once" with mocked Supabase are optional, not the source of truth.** Keep that invariant load-bearing in the integration test against the real test DB. The unit test can be a sketch of intent; the integration test is the actual proof.
 
 ---
 
-## 13. Definition of done
+## 14. Definition of done
 
 | Gate | Verified via |
 |---|---|
@@ -569,7 +621,7 @@ Hebrew strings are v1 — same caveat as Phase 3a assessment items: a Hebrew cop
 | `npm test` green (all new + all existing) | CI |
 | `npm run build` green | CI |
 | `node scripts/verify-all-surfaces.mjs` — 0 critical/serious a11y violations | Local + CI |
-| Thumbs persist across reload on chat / recs / interview | Local browser |
+| Thumbs persist across reload on recs / interview-wrap | Local browser |
 | NPS prompt fires after first report download on next `/recommendations` load | Local browser |
 | NPS prompt does NOT re-appear after submit or dismiss | Local browser |
 | CSV export returns valid Hebrew-safe CSV with formula-injection guard, behind Bearer auth | Local + production smoke |
@@ -578,8 +630,12 @@ Hebrew strings are v1 — same caveat as Phase 3a assessment items: a Hebrew cop
 
 ---
 
-## 14. Out of scope (intentional)
+## 15. Out of scope (intentional)
 
+- **Chat thumbs** — deferred to Phase 6b.5. `MessageList` currently receives AI SDK `UIMessage[]` with client-generated `m.id`, not persisted `messages.id`. Wiring requires `streamText({ messageMetadata })` to ride the persisted DB id back through the stream + a client-side `Map<ai-sdk-id, db-id>`. The `'message'` target_type is reserved in the schema enum so the migration doesn't need re-running. Phase 6b.5 sketch:
+  1. `lib/ai/engine.ts` `onAssistantFinish` callback receives the persisted row id; engine emits it via `streamText({ messageMetadata: { persisted_id } })`
+  2. Client `useChat({ onMessageMetadata })` populates a `Map<ai-sdk-id, db-id>` lookup
+  3. `MessageList` reads from that map; `<ThumbsRow>` mounts only on messages where `db-id` exists (the assistant turn has finished persisting)
 - `account_saved` analytics event (deferred until `lib/anonymous.ts` exposes promotion-result)
 - Admin UI page (Supabase Studio + CSV export are sufficient for Phase 6b weekly review)
 - Per-user funnel cuts in Vercel Analytics (lives in Supabase joins instead)
@@ -591,7 +647,7 @@ Hebrew strings are v1 — same caveat as Phase 3a assessment items: a Hebrew cop
 
 ---
 
-## 15. Risks / mitigations
+## 16. Risks / mitigations
 
 | Risk | Mitigation |
 |---|---|
