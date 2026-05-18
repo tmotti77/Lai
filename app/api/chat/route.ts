@@ -11,6 +11,7 @@ import { makeSetStageTool } from "@/lib/ai/tools";
 import { updateConversationStage } from "@/lib/db/profile";
 import { runExtraction } from "@/lib/ai/extraction";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
   }
 
   const conversation = await getOrCreateConversation(internalUserId, incomingConversationId);
+  const wasFirstMessage = conversation.message_count === 0;
 
   const lastUserMessage = body.messages[body.messages.length - 1];
   const userText =
@@ -74,6 +76,10 @@ export async function POST(req: Request) {
   const setCookie = `${ACTIVE_CONVERSATION_COOKIE}=${conversation.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ACTIVE_CONVERSATION_MAX_AGE_SECONDS}${
     process.env.NODE_ENV === "production" ? "; Secure" : ""
   }`;
+
+  if (wasFirstMessage) {
+    track("conversation_started", { surface: "chat" });
+  }
 
   return streamLlmTurn({
     userText,
