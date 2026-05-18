@@ -11,6 +11,7 @@ import { profileHash } from "@/lib/matching/hash";
 import { generateExplanations } from "@/lib/ai/prompts/explanations";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track } from "@/lib/analytics";
 
 async function loadThumbsForRecommendation(
   svc: ReturnType<typeof createServiceClient>,
@@ -30,6 +31,10 @@ async function loadThumbsForRecommendation(
       .filter((r) => r.thumbs_value === 1 || r.thumbs_value === -1)
       .map((r) => [r.target_id, r.thumbs_value as -1 | 1])
   );
+}
+
+function dimensionCount(weightsUsed: Partial<Record<string, number>>): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+  return Object.keys(weightsUsed).length as 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }
 
 export const runtime = "nodejs";
@@ -75,6 +80,10 @@ export async function POST(request: NextRequest) {
       if (cached) {
         const svc = createServiceClient();
         const thumbs = await loadThumbsForRecommendation(svc, internalUserId, cached.id);
+        track("recommendations_generated", {
+          cache_hit: true,
+          dimension_count: dimensionCount(cached.rankings[0]?.weights_used ?? {}),
+        });
         return Response.json({
           rankings: cached.rankings,
           paths: cached.paths,
@@ -118,6 +127,11 @@ export async function POST(request: NextRequest) {
     const recommendationId = recRow!.id;
     // Fresh recommendations have no thumbs yet
     const thumbs: Record<string, -1 | 1> = {};
+
+    track("recommendations_generated", {
+      cache_hit: false,
+      dimension_count: dimensionCount(rankings[0]?.weights_used ?? {}),
+    });
 
     return Response.json({
       rankings: rankings.slice(0, 10),
