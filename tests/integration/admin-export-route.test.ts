@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { config } from "dotenv";
 import path from "node:path";
+import { createClient } from "@supabase/supabase-js";
 
 // Load .env.local with override so real credentials replace stubs set by
 // tests/setup.ts. Must happen before any call to createServiceClient() since
@@ -13,14 +14,12 @@ const HAS_REAL_DB =
 
 // Mock createServiceClient to use a real-env client (same pattern as feedback-route.test.ts)
 vi.mock("@/lib/supabase/service", () => ({
-  createServiceClient: () => {
-    const { createClient } = require("@supabase/supabase-js");
-    return createClient(
+  createServiceClient: () =>
+    createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-  },
+    ),
 }));
 
 import { GET } from "@/app/api/admin/feedback/export/route";
