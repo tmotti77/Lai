@@ -54,7 +54,7 @@ git pull --ff-only
 git checkout -b feat/phase-7a-launch-readiness
 ```
 
-All Phase 7a code tasks land on this branch. (Tasks 22 [CLAUDE.md] lands separately on `main` after the PR merges.)
+All Phase 7a code tasks land on this branch. (Task 24 [CLAUDE.md] lands separately on `main` after the PR merges.)
 
 ---
 
@@ -888,12 +888,14 @@ Same command as before. Expected: ~15 checks reported, cleanup runs even if earl
 git add scripts/smoke-production.mjs
 git commit -m "feat(smoke): smoke-production.mjs checks 11-15 + cleanup
 
-Migration check (read-only via information_schema), storage bucket
-privacy + anon-denied, security headers (nosniff; CSP deferred to
-7b), env sanity (existence-only never-print + supabase ref host
-match), and cleanup via cascade-DELETE from users by smoke user_id
-(captured during check 07). All wrapped in try/finally so cleanup
-runs even on early failure.
+Migration check (read-only via SELECT limit(0) on actual tables —
+information_schema isn't queryable via supabase-js; PostgREST exposes
+public schema only). Storage bucket privacy + anon-denied (requires
+explicit error, not empty list). Security headers (nosniff; CSP
+deferred to 7b). Env sanity (existence-only never-print + supabase
+ref host match). Cleanup via cascade-DELETE from users by smoke
+user_id (captured during check 02b from anonymous_sessions). All
+wrapped in try/finally so cleanup runs even on early failure.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```
@@ -1583,7 +1585,8 @@ Get the Preview URL from Vercel (e.g., `https://career-os-git-feat-phase-7a-...v
 Run:
 
 ```powershell
-curl -X POST "$previewUrl/api/feedback" `
+# Use curl.exe (the actual curl binary), NOT PowerShell's curl alias which maps to Invoke-WebRequest
+curl.exe -X POST "$previewUrl/api/feedback" `
   -H "content-type: application/json" `
   -H "cookie: co_anon=test" `
   -d '{"kind":"thumb","surface":"recommendations","target_type":"recommendation_occupation","target_id":"dummy:data-analyst","thumbs_value":1}'
@@ -1790,8 +1793,8 @@ The Task 18 smoke run included R1 polling. If it passed, R1 is done.
 If R1 was skipped (because args not provided) or failed, re-run JUST R1:
 
 ```powershell
-# Re-trigger the test event
-curl -X POST "$env:PROD_URL/api/_internal/sentry-test" `
+# Re-trigger the test event — use curl.exe, not the PowerShell curl alias
+curl.exe -X POST "$env:PROD_URL/api/_internal/sentry-test" `
   -H "authorization: Bearer $env:ADMIN_EXPORT_TOKEN"
 # Get eventId from the response, then poll Sentry manually in the dashboard:
 # https://sentry.io/organizations/<org>/projects/<project>/?query=event.id:<eventId>
@@ -1943,7 +1946,7 @@ After the existing Phase 6c section (and before "Project-specific conventions"),
 
 Single-question scope: "can this app safely receive real production traffic from closed-beta testers?" Three tracks: code+docs (this repo PR), infra setup (human via dashboards), verification (smoke + manual walk + rollback drill).
 
-- **Smoke runner**: `scripts/smoke-production.mjs` runs 15 blocking checks + R1 Sentry polling against any deployed URL. Cookie-jar fetch wrapper carries consent state through the journey. Cleanup is cascade-DELETE from `users` by the smoke user_id (captured during check 07).
+- **Smoke runner**: `scripts/smoke-production.mjs` runs 15 blocking checks + R1 Sentry polling against any deployed URL. Cookie-jar fetch wrapper carries consent state through the journey. Cleanup is cascade-DELETE from `users` by the smoke user_id (captured during check 02b via an anonymous_sessions lookup keyed on the co_anon cookie value, BEFORE any application writes happen — so cleanup works even if later checks fail).
 - **Async sweeper**: `scripts/smoke-cleanup.mjs` deletes anonymous users older than 24h with no chat activity. Safe to run anytime — only touches stale anonymous accounts.
 - **Sentry test endpoint**: `/api/_internal/sentry-test` reuses ADMIN_EXPORT_TOKEN, calls `captureException` + `flush(5000)`, returns `eventId`. Smoke polls the Sentry Events API with a separate read-only token (`SENTRY_API_TOKEN`, never set in Vercel — local-only).
 - **Node 24 mandate**: `.nvmrc=24`, `engines.node "^24"`, `@types/node "^24"`, CI workflow Node 24, Vercel project Node 24. Node 20 EOL 2026-04-30.
