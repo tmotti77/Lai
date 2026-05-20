@@ -186,6 +186,113 @@ async function checkConsent() {
   }
 }
 
+// ── #6 Recommendations shape ─────────────────────────────────────
+async function checkRecommendationsShape() {
+  const res = await fetchWith("/api/recommendations", { method: "POST" });
+  if (res.status !== 200) {
+    check("06 recs-shape", false, `status=${res.status}`);
+    return null;
+  }
+  const body = await res.json();
+  const ok = typeof body.recommendation_id === "string" &&
+             body.thumbs && typeof body.thumbs === "object";
+  check("06 recs-shape", ok, `rec_id=${!!body.recommendation_id} thumbs=${!!body.thumbs}`);
+  return body;
+}
+
+// ── #7 Thumb writes ──────────────────────────────────────────────
+async function checkThumbWrites(recommendationId, occupationId) {
+  const targetId = `${recommendationId}:${occupationId}`;
+  const res = await fetchWith("/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      kind: "thumb",
+      surface: "recommendations",
+      target_type: "recommendation_occupation",
+      target_id: targetId,
+      thumbs_value: 1,
+      metadata: { smoke_run_id: SMOKE_RUN_ID },
+    }),
+  });
+  if (res.status !== 200) {
+    check("07 thumb-write", false, `status=${res.status}`);
+    return;
+  }
+  // Service-role lookup to confirm the row exists and belongs to our smoke user
+  const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data } = await svc
+    .from("feedback")
+    .select("user_id")
+    .eq("target_id", targetId)
+    .eq("user_id", smokeUserId)
+    .eq("thumbs_value", 1)
+    .maybeSingle();
+  check("07 thumb-write", !!data, `row=${!!data} matches_smoke_user=${data?.user_id === smokeUserId}`);
+}
+
+// ── #8 NPS idempotency ───────────────────────────────────────────
+async function checkNpsIdempotency() {
+  const body = {
+    kind: "nps",
+    nps_score: 9,
+    nps_trigger: "pdf_download",
+    comment_he: "",
+  };
+  const r1 = await fetchWith("/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j1 = await r1.json().catch(() => ({}));
+  const okFirst = r1.status === 200 && j1.ok === true && !j1.already;
+  check("08a nps-first", okFirst, `status=${r1.status} ok=${j1.ok} already=${j1.already}`);
+
+  const r2 = await fetchWith("/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j2 = await r2.json().catch(() => ({}));
+  const okSecond = r2.status === 200 && j2.ok === true && j2.already === true;
+  check("08b nps-already", okSecond, `status=${r2.status} already=${j2.already}`);
+}
+
+// ── #9 NPS dismiss ───────────────────────────────────────────────
+async function checkNpsDismiss() {
+  const res = await fetchWith("/api/feedback/nps-dismiss", { method: "POST" });
+  check("09 nps-dismiss", res.status === 204, `status=${res.status}`);
+}
+
+// ── #10 Admin export auth matrix (status + content-type ONLY) ────
+async function checkAdminExportAuth() {
+  if (!args["skip-admin-success"]) {
+    const ok = await fetch(`${URL}/api/admin/feedback/export`, {
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    const okStatus = ok.status === 200;
+    const okType = (ok.headers.get("content-type") ?? "").startsWith("text/csv");
+    // Drain body without inspecting it
+    if (ok.body) await ok.body.cancel();
+    check("10a admin-ok", okStatus && okType,
+      `status=${ok.status} ct=${ok.headers.get("content-type")}`);
+  } else {
+    check("10a admin-ok-skipped", true, "skipped via --skip-admin-success (preview env)");
+  }
+
+  const wrong = await fetch(`${URL}/api/admin/feedback/export`, {
+    headers: { authorization: "Bearer wrong-token-different-length-than-real-one" },
+  });
+  if (wrong.body) await wrong.body.cancel();
+  check("10b admin-wrong", wrong.status === 401, `status=${wrong.status}`);
+
+  const noAuth = await fetch(`${URL}/api/admin/feedback/export`);
+  if (noAuth.body) await noAuth.body.cancel();
+  check("10c admin-noauth", noAuth.status === 401, `status=${noAuth.status}`);
+}
+
 async function main() {
   await checkBootAndRtl();
   await checkAnonCookie();
@@ -193,7 +300,18 @@ async function main() {
   await checkChatReachable();
   await checkConsent();
 
-  // Checks 6-15 + R1 added in subsequent tasks.
+  const recs = await checkRecommendationsShape();
+  const KNOWN_OCC_ID = "data-analyst";
+  if (recs?.recommendation_id) {
+    await checkThumbWrites(recs.recommendation_id, KNOWN_OCC_ID);
+  } else {
+    check("07 thumb-write", false, "no recommendation_id from check 6");
+  }
+  await checkNpsIdempotency();
+  await checkNpsDismiss();
+  await checkAdminExportAuth();
+
+  // Checks 11-15 + R1 added in subsequent tasks.
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed; smoke_run_id=${SMOKE_RUN_ID}`);
