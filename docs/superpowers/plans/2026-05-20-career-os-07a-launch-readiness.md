@@ -44,6 +44,20 @@ CLAUDE.md                                       Phase 7a architecture section
 
 ---
 
+## Task 0 [agent]: Create feature branch
+
+- [ ] **Step 1: Branch off main**
+
+```powershell
+git checkout main
+git pull --ff-only
+git checkout -b feat/phase-7a-launch-readiness
+```
+
+All Phase 7a code tasks land on this branch. (Tasks 22 [CLAUDE.md] lands separately on `main` after the PR merges.)
+
+---
+
 ## Task 1 [agent]: Node 24 upgrade — local toolchain
 
 **Files:**
@@ -72,16 +86,26 @@ In `package.json`, set:
 
 (Preserve existing entries; only change those two values.)
 
-- [ ] **Step 3: Reinstall under Node 24**
+- [ ] **Step 3: Install under Node 24 (regenerates lockfile)**
 
 ```powershell
 nvm use 24
-npm ci
+npm install
 ```
 
 If `nvm use 24` says version not installed, run `nvm install 24` first.
 
-- [ ] **Step 4: Verify type-check + tests + build pass under Node 24**
+**Note:** use `npm install` (not `npm ci`) because the lockfile needs to update for the new `@types/node` version. `npm ci` would fail with a lockfile/package-json mismatch.
+
+- [ ] **Step 4: Sanity-check with npm ci (after install regenerated lockfile)**
+
+```powershell
+npm ci
+```
+
+This should now succeed cleanly. If it fails, the lockfile didn't update properly — re-run `npm install`.
+
+- [ ] **Step 5: Verify type-check + tests + build pass under Node 24**
 
 ```powershell
 node --version          # → v24.x
@@ -92,7 +116,7 @@ npm run build
 
 All four must succeed. If `@sentry/nextjs` or any other dep complains about Node 24, STOP and report — likely just needs a version bump.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```powershell
 git add .nvmrc package.json package-lock.json
@@ -181,25 +205,26 @@ function makeReq(token: string | null): Request {
 describe("POST /api/_internal/sentry-test", () => {
   it("returns 401 without Bearer token", async () => {
     process.env.ADMIN_EXPORT_TOKEN = "expected-token-value";
-    const res = await POST(makeReq(null));
+    // Route signature is (req: NextRequest); cast `as never` per existing route-test convention
+    const res = await POST(makeReq(null) as never);
     expect(res.status).toBe(401);
   });
 
   it("returns 401 with wrong token", async () => {
     process.env.ADMIN_EXPORT_TOKEN = "expected-token-value";
-    const res = await POST(makeReq("wrong-token-length-different-from-expected"));
+    const res = await POST(makeReq("wrong-token-length-different-from-expected") as never);
     expect(res.status).toBe(401);
   });
 
   it("returns 503 when ADMIN_EXPORT_TOKEN env not set", async () => {
     delete process.env.ADMIN_EXPORT_TOKEN;
-    const res = await POST(makeReq("anything"));
+    const res = await POST(makeReq("anything") as never);
     expect(res.status).toBe(503);
   });
 
   it("captures + flushes and returns eventId on valid token", async () => {
     process.env.ADMIN_EXPORT_TOKEN = "expected-token-value";
-    const res = await POST(makeReq("expected-token-value"));
+    const res = await POST(makeReq("expected-token-value") as never);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.eventId).toBe("abc123def456abc123def456abc12345");
@@ -317,6 +342,7 @@ const { values: args } = parseArgs({
     "sentry-org":               { type: "string" },
     "sentry-project":           { type: "string" },
     "sentry-api-token":         { type: "string" },
+    "skip-admin-success":       { type: "boolean", default: false },  // preview-env mode
   },
 });
 
@@ -340,6 +366,8 @@ const results = [];
 
 // Track cookies the server sets so we can include them on subsequent requests.
 let cookieJar = "";
+let smokeUserId = null;   // captured from anonymous_sessions right after cookie creation
+let coAnonToken = null;   // the co_anon cookie value, used to look up our user_id
 
 function rememberCookies(res) {
   const setCookie = res.headers.get("set-cookie");
@@ -376,7 +404,7 @@ async function checkBootAndRtl() {
     `status=${res.status}`);
 }
 
-// ── #2 Anonymous cookie attributes ───────────────────────────────
+// ── #2 Anonymous cookie attributes + capture user_id for cleanup ─
 async function checkAnonCookie() {
   // /chat is the closed-beta entry; first request should set co_anon
   const res = await fetchWith("/chat");
@@ -388,9 +416,29 @@ async function checkAnonCookie() {
   check("02 anon-cookie", hasCoAnon && hasSecure && hasHttpOnly && hasSameSite,
     `co_anon=${hasCoAnon} Secure=${hasSecure} HttpOnly=${hasHttpOnly} SameSite=${hasSameSite}`);
 
+  // Extract co_anon value from Set-Cookie header for user_id lookup
+  const match = setCookie.match(/co_anon=([^;]+)/);
+  if (match) coAnonToken = match[1];
+
+  // Capture the smoke user_id IMMEDIATELY so cleanup works even on early failure.
+  // Middleware creates the anonymous_sessions row before any other write.
+  if (coAnonToken) {
+    const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: session } = await svc
+      .from("anonymous_sessions")
+      .select("user_id")
+      .eq("token", coAnonToken)
+      .maybeSingle();
+    if (session?.user_id) smokeUserId = session.user_id;
+  }
+  check("02b smoke-user-captured", !!smokeUserId,
+    `user_id=${smokeUserId ? smokeUserId.slice(0, 8) + "..." : "missing"}`);
+
   // Persistence: a second request must round-trip the cookie back.
   const res2 = await fetchWith("/chat");
-  check("02b anon-cookie-persists", res2.status === 200, `status=${res2.status}`);
+  check("02c anon-cookie-persists", res2.status === 200, `status=${res2.status}`);
 }
 
 // ── #3 Static pages render ───────────────────────────────────────
@@ -405,11 +453,14 @@ async function checkStaticPages() {
 
 // ── #4 Chat reachability ─────────────────────────────────────────
 async function checkChatReachable() {
-  // Without consent: 403 expected
+  // Without consent: 403 expected.
+  // AI SDK v6 UIMessage shape uses {parts: [{type:'text', text:'...'}]}.
   const res403 = await fetchWith("/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages: [{ role: "user", content: "שלום" }] }),
+    body: JSON.stringify({
+      messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "שלום" }] }],
+    }),
   });
   check("04a chat-no-consent", res403.status === 403,
     `status=${res403.status}`);
@@ -438,7 +489,9 @@ async function checkConsent() {
     const res = await fetchWith("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: "היי" }] }),
+      body: JSON.stringify({
+        messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "היי" }] }],
+      }),
       signal: ctrl.signal,
     });
     if (res.status !== 200) {
@@ -524,7 +577,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Add to `scripts/smoke-production.mjs` (between the existing `checkConsent()` and `main()`):
 
 ```javascript
-let smokeUserId = null;   // populated after first auth'd write; used by cleanup
+// (smokeUserId + coAnonToken declared at top of file; captured during checkAnonCookie)
 
 // ── #6 Recommendations shape ─────────────────────────────────────
 async function checkRecommendationsShape() {
@@ -559,7 +612,7 @@ async function checkThumbWrites(recommendationId, occupationId) {
     check("07 thumb-write", false, `status=${res.status}`);
     return;
   }
-  // Service-role lookup to confirm the row exists
+  // Service-role lookup to confirm the row exists and belongs to our smoke user
   const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -567,10 +620,10 @@ async function checkThumbWrites(recommendationId, occupationId) {
     .from("feedback")
     .select("user_id")
     .eq("target_id", targetId)
+    .eq("user_id", smokeUserId)
     .eq("thumbs_value", 1)
     .maybeSingle();
-  check("07 thumb-write", !!data, `row=${!!data}`);
-  if (data) smokeUserId = data.user_id;
+  check("07 thumb-write", !!data, `row=${!!data} matches_smoke_user=${data?.user_id === smokeUserId}`);
 }
 
 // ── #8 NPS idempotency ───────────────────────────────────────────
@@ -608,15 +661,19 @@ async function checkNpsDismiss() {
 
 // ── #10 Admin export auth matrix (status + content-type ONLY) ────
 async function checkAdminExportAuth() {
-  const ok = await fetch(`${URL}/api/admin/feedback/export`, {
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
-  });
-  const okStatus = ok.status === 200;
-  const okType = (ok.headers.get("content-type") ?? "").startsWith("text/csv");
-  // Drain body without inspecting it
-  if (ok.body) await ok.body.cancel();
-  check("10a admin-ok", okStatus && okType,
-    `status=${ok.status} ct=${ok.headers.get("content-type")}`);
+  if (!args["skip-admin-success"]) {
+    const ok = await fetch(`${URL}/api/admin/feedback/export`, {
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    const okStatus = ok.status === 200;
+    const okType = (ok.headers.get("content-type") ?? "").startsWith("text/csv");
+    // Drain body without inspecting it
+    if (ok.body) await ok.body.cancel();
+    check("10a admin-ok", okStatus && okType,
+      `status=${ok.status} ct=${ok.headers.get("content-type")}`);
+  } else {
+    check("10a admin-ok-skipped", true, "skipped via --skip-admin-success (preview env)");
+  }
 
   const wrong = await fetch(`${URL}/api/admin/feedback/export`, {
     headers: { authorization: "Bearer wrong-token-different-length-than-real-one" },
@@ -667,7 +724,7 @@ async function main() {
 
 - [ ] **Step 2: Sanity-check against dev server**
 
-Run the same command from Task 4 Step 2. Expected: 11 checks pass (or 10 with thumb-write skipped if recs returned no rec_id — that's acceptable for a fresh user with no profile).
+Run the same command from Task 4 Step 2. Expected: all 11 checks pass. If `06 recs-shape` returns null `recommendation_id`, that's a route bug — the spec contract requires the field to always be present (empty `paths`/`rankings` arrays are OK for a fresh user, but `recommendation_id` itself must be set). Stop and investigate.
 
 - [ ] **Step 3: Commit**
 
@@ -695,25 +752,23 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ```javascript
 // ── #11 Migration check (read-only) ──────────────────────────────
 async function checkMigrations() {
+  // PostgREST exposes public schema only; information_schema isn't queryable via supabase-js.
+  // Use a tiny service-role SELECT on the actual tables: if the SELECT succeeds with no error,
+  // the table + columns exist. limit(0) returns empty data fast.
   const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data: fb } = await svc
-    .from("information_schema.columns")
-    .select("column_name", { count: "exact" })
-    .eq("table_schema", "public")
-    .eq("table_name", "feedback");
-  const fbOk = (fb?.length ?? 0) >= 12;
-  check("11a migration-feedback", fbOk, `columns=${fb?.length ?? 0}`);
+  const { error: fbErr } = await svc
+    .from("feedback")
+    .select("id, surface, target_type, target_id, thumbs_value, nps_score, nps_trigger, comment_he, metadata, created_at, updated_at, user_id")
+    .limit(0);
+  check("11a migration-feedback", !fbErr, fbErr ? `error=${fbErr.message}` : "feedback table + 12 cols exist");
 
-  const { data: usersCol } = await svc
-    .from("information_schema.columns")
-    .select("column_name")
-    .eq("table_schema", "public")
-    .eq("table_name", "users")
-    .eq("column_name", "nps_eligibility_first_at")
-    .maybeSingle();
-  check("11b migration-users-nps", !!usersCol, `col=${!!usersCol}`);
+  const { error: usrErr } = await svc
+    .from("users")
+    .select("id, nps_eligibility_first_at, nps_submitted_at, nps_dismissed_at, nps_trigger_first, first_report_downloaded_at")
+    .limit(0);
+  check("11b migration-users-nps", !usrErr, usrErr ? `error=${usrErr.message}` : "users NPS cols exist");
 }
 
 // ── #12 Storage bucket ───────────────────────────────────────────
@@ -726,12 +781,13 @@ async function checkStorage() {
     bucket && bucket.public === false,
     `exists=${!!bucket} public=${bucket?.public}`);
 
-  // Anon-client list must fail
+  // Anon-client list MUST return an explicit error (private bucket).
+  // An empty successful list is a false positive — bucket might be public-readable but empty.
   const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { data: list, error } = await anon.storage.from("cv-uploads").list();
+  const { error } = await anon.storage.from("cv-uploads").list();
   check("12b storage-anon-denied",
-    !list || list.length === 0 || !!error,
-    `denied=${!!error || list?.length === 0}`);
+    !!error,
+    error ? `denied (expected): ${error.message}` : "FAIL: anon list succeeded — bucket is not private");
 }
 
 // ── #13 Security headers (CSP deferred to 7b — not asserted) ─────
@@ -855,43 +911,56 @@ Append before the final results log in `main()`:
 
 ```javascript
 // ── R1 Sentry pipeline (release evidence, non-blocking) ──────────
+// IMPORTANT: must NEVER throw — any network/JSON error must be caught
+// and logged as a check failure (which is itself non-blocking for exit code).
 async function checkSentryPipeline() {
-  if (!SENTRY_ORG || !SENTRY_PROJECT || !SENTRY_API_TOKEN) {
-    check("R1 sentry-skipped", true, "sentry args not provided");
-    return;
-  }
-  // Trigger the test event
-  const trig = await fetch(`${URL}/api/_internal/sentry-test`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
-  });
-  if (trig.status !== 200) {
-    check("R1a sentry-trigger", false, `status=${trig.status}`);
-    return;
-  }
-  const { eventId } = await trig.json();
-  check("R1a sentry-trigger", typeof eventId === "string" && eventId.length >= 16,
-    `eventId=${eventId?.slice(0, 8)}...`);
-
-  // Poll Sentry Events API for up to 5 min
-  const deadline = Date.now() + 5 * 60 * 1000;
-  let found = false;
-  while (Date.now() < deadline) {
-    const sentryRes = await fetch(
-      `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/events/?query=event.id:${eventId}`,
-      { headers: { authorization: `Bearer ${SENTRY_API_TOKEN}` } },
-    );
-    if (sentryRes.ok) {
-      const arr = await sentryRes.json();
-      if (Array.isArray(arr) && arr.length > 0) {
-        found = true;
-        break;
-      }
+  try {
+    if (!SENTRY_ORG || !SENTRY_PROJECT || !SENTRY_API_TOKEN) {
+      check("R1 sentry-skipped", true, "sentry args not provided");
+      return;
     }
-    await new Promise((r) => setTimeout(r, 15000));
+    // Trigger the test event
+    const trig = await fetch(`${URL}/api/_internal/sentry-test`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    if (trig.status !== 200) {
+      check("R1a sentry-trigger", false, `status=${trig.status}`);
+      return;
+    }
+    const triggerBody = await trig.json();
+    const eventId = triggerBody?.eventId;
+    check("R1a sentry-trigger", typeof eventId === "string" && eventId.length >= 16,
+      `eventId=${eventId ? eventId.slice(0, 8) + "..." : "missing"}`);
+    if (!eventId) return;
+
+    // Poll Sentry Events API for up to 5 min
+    const deadline = Date.now() + 5 * 60 * 1000;
+    let found = false;
+    while (Date.now() < deadline) {
+      try {
+        const sentryRes = await fetch(
+          `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/events/?query=event.id:${eventId}`,
+          { headers: { authorization: `Bearer ${SENTRY_API_TOKEN}` } },
+        );
+        if (sentryRes.ok) {
+          const arr = await sentryRes.json();
+          if (Array.isArray(arr) && arr.length > 0) {
+            found = true;
+            break;
+          }
+        }
+      } catch (pollErr) {
+        // Network blip during polling — keep retrying until deadline
+        console.warn(`R1 poll attempt failed: ${pollErr.message}`);
+      }
+      await new Promise((r) => setTimeout(r, 15000));
+    }
+    check("R1b sentry-event-visible", found,
+      `event polling completed; visible=${found}`);
+  } catch (err) {
+    check("R1 sentry-error", false, `unexpected: ${err.message}`);
   }
-  check("R1b sentry-event-visible", found,
-    `event polling completed; visible=${found}`);
 }
 ```
 
@@ -1235,37 +1304,38 @@ Reply with the project ref and URL (NOT the keys). Claude will use them to verif
 
 **Action required by user — Claude cannot run migrations against prod from this environment.**
 
-- [ ] **Step 1: Confirm pre-migration backup**
+- [ ] **Step 1: Confirm pre-migration backup OR take a manual dump**
 
-Supabase Dashboard → Backups → confirm a backup exists from within the last 24h. (Brand-new project should have an initial snapshot.)
+Supabase Dashboard → Database → Backups → confirm a backup exists from within the last 24h.
 
-- [ ] **Step 2: Link CLI to prod project**
+⚠️ For brand-new Pro projects, the first daily backup may not have run yet. If no backup is listed, take a manual dump before applying migrations:
 
 ```powershell
 npx supabase login    # if not logged in
 npx supabase link --project-ref <prod-ref>
+npx supabase db dump --linked --file backup-pre-7a-migrations.sql
 ```
 
-You'll be asked for the DB password from Task 11.
+Store `backup-pre-7a-migrations.sql` securely (e.g., move to a backup folder outside the repo — DO NOT commit it).
 
-- [ ] **Step 3: Apply migrations**
+- [ ] **Step 2: Apply migrations**
 
 ```powershell
-npx supabase db push
+npx supabase db push --linked
 ```
 
 Expected: 11 migration files apply cleanly. Output should end with "Finished supabase db push." If any migration errors, STOP and report.
 
-- [ ] **Step 4: Verify schema**
+- [ ] **Step 3: Verify schema**
 
 ```powershell
-npx supabase db remote query "select table_name from information_schema.tables where table_schema='public' order by table_name"
+npx supabase db query --linked "select table_name from information_schema.tables where table_schema='public' order by table_name"
 ```
 
 Expected tables: `anonymous_sessions`, `assessments`, `career_profile`, `consents`, `conversations`, `cv_uploads`, `feedback`, `interview_messages`, `interview_sessions`, `messages`, `occupations`, `plan_tasks`, `plans`, `recommendations`, `skills`, `users`.
 
 ```powershell
-npx supabase db remote query "select count(*) from information_schema.columns where table_name='feedback'"
+npx supabase db query --linked "select count(*) from information_schema.columns where table_name='feedback'"
 ```
 
 Expected: `count = 12`.
@@ -1283,8 +1353,8 @@ npm run seed:occupations
 - [ ] **Step 6: Verify seed**
 
 ```powershell
-npx supabase db remote query "select count(*) from occupations"
-npx supabase db remote query "select count(*) from skills"
+npx supabase db query --linked "select count(*) from occupations"
+npx supabase db query --linked "select count(*) from skills"
 ```
 
 Expected: occupations ~20, skills ~60.
@@ -1319,9 +1389,23 @@ If Google sign-in will be enabled for closed beta:
 
 Either:
 - **Option A (defer)**: Use Supabase default email for closed beta. Note this is rate-limited (~4 emails/h) and deliverability may be inconsistent.
-- **Option B (custom SMTP)**: Authentication → Email → SMTP Settings → configure with Postmark/Resend/SES. Verify with a magic-link signup test.
+- **Option B (custom SMTP)**: Authentication → Email → SMTP Settings → configure with Postmark/Resend/SES.
 
 Document choice in `docs/superpowers/runbooks/launch-rollback.md` (append a "Notes" section).
+
+- [ ] **Step 3b: Magic-link smoke test (mandatory regardless of SMTP choice)**
+
+This verifies the entire auth pipeline works. Do NOT skip — applies to both Option A and Option B.
+
+1. Visit `https://<prod-domain>/auth/sign-in` (or wherever the magic-link form is)
+2. Enter a real email address you control
+3. Submit the form. Expect: "check your email" confirmation message
+4. Open the email (check spam folder if Option A — Supabase default often lands there)
+5. Click the magic link. Expect: lands on `https://<prod-domain>/auth/callback` then redirects to the post-auth destination (probably `/recommendations`)
+6. Verify in Supabase Dashboard → Authentication → Users that your email appears as a signed-in user
+7. Confirm the session works: visit `/recommendations` — should NOT prompt for sign-in again
+
+Record the result + delivery time in your notes. If the email took >5 min to arrive on Option A, strongly consider Option B before public launch.
 
 - [ ] **Step 4: Verify `cv-uploads` storage bucket**
 
@@ -1333,20 +1417,29 @@ Storage → Settings → S3 connection (or Object lifecycle on Edge) → add lif
 
 Take a screenshot of the lifecycle rule and save to `docs/superpowers/runbooks/screenshots/storage-lifecycle.png` (you'll add this in Task 23).
 
-- [ ] **Step 5: RLS spot-check**
+- [ ] **Step 4b: Take a screenshot of the storage lifecycle rule**
+
+Save to `docs/superpowers/runbooks/screenshots/storage-lifecycle.png` (you'll commit this in Task 23).
+
+- [ ] **Step 5: RLS spot-check (3 tables — users, feedback, career_profile)**
+
+For each of the three tables below, hit the REST endpoint with the anon key and verify NO real rows leak:
 
 ```powershell
 # Replace <prod-ref> + <anon-key>
-curl "https://<prod-ref>.supabase.co/rest/v1/users?select=*" `
-  -H "apikey: <anon-key>" `
-  -H "Authorization: Bearer <anon-key>"
+$headers = @{ apikey = "<anon-key>"; Authorization = "Bearer <anon-key>" }
+foreach ($table in @("users","feedback","career_profile")) {
+  $url = "https://<prod-ref>.supabase.co/rest/v1/$table" + "?select=*&limit=5"
+  $r = Invoke-WebRequest -Uri $url -Headers $headers -SkipHttpErrorCheck
+  Write-Host "$table → status=$($r.StatusCode), bodyLen=$($r.Content.Length)"
+}
 ```
 
-Expected: response is `[]` (RLS hides rows) OR `401`/`403`. Never a list of real user rows.
+Expected for ALL THREE tables: status 200 with body `[]` (RLS hides rows), OR status 401/403. **Never** a list of real user rows. If any of the three returns real data, STOP — RLS is misconfigured.
 
 - [ ] **Step 6: Confirm to Claude**
 
-Reply with: auth redirect URLs configured, OAuth choice (configured / skipped), SMTP choice (custom / default), bucket private + lifecycle set, RLS spot-check result.
+Reply with: auth redirect URLs configured, OAuth choice (configured / skipped), SMTP choice (custom / default), magic-link smoke result, bucket private + lifecycle set + screenshot taken, RLS spot-check result for all 3 tables.
 
 ---
 
@@ -1409,10 +1502,10 @@ Vercel Dashboard → Project → Settings → Environment Variables → For each
 
 Same list, scoped to **Preview** environment, but with **dev** values:
 
-- `NEXT_PUBLIC_SUPABASE_URL` → dev project URL (`wqswamtcppjmkwykukjp.supabase.co`)
+- `NEXT_PUBLIC_SUPABASE_URL` → dev project URL (`https://wqswamtcppjmkwykukjp.supabase.co`)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → dev anon key
 - `SUPABASE_SERVICE_ROLE_KEY` → dev service-role key
-- `NEXT_PUBLIC_SITE_URL` → leave blank or `https://<preview-url>` (Vercel auto-fills)
+- `NEXT_PUBLIC_SITE_URL` → **set to a stable dev/preview URL** (e.g., your branch's predictable Vercel URL OR `https://preview.career-os.app` if you set up a domain alias). Custom env vars are NOT auto-filled by Vercel from `VERCEL_URL`. If you can't pin a single value, set it to the prod domain — anything that's a valid URL works for the few routes that read it.
 - `ANTHROPIC_*` — same as prod or dev (cost decision)
 - `SENTRY_*` — optionally omit, or share dev Sentry project with `environment=preview` tag
 - `ADMIN_EXPORT_TOKEN` — **OMIT** (admin export returns 401 in preview = desired)
@@ -1435,6 +1528,8 @@ Take a screenshot for the runbook.
 
 - [ ] **Step 2: Vercel Firewall rate limits**
 
+⚠️ Rate limiting on Vercel Firewall requires Pro plan or higher. Confirm your team's plan supports rate-limit rules before this step. Docs: https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting
+
 Vercel Project → Firewall → Custom Rules → Add Rule:
 
 - Name: `rate-limit-chat`
@@ -1449,7 +1544,9 @@ Add another rule for `/api/feedback`:
 - Action: Rate Limit
 - Rate: 60 requests / 60 seconds / per IP
 
-Take screenshots for the runbook.
+**Critical**: after adding rules, click **Review Changes** then **Publish** in the Firewall UI. Unpublished rules don't take effect.
+
+Take screenshots for the runbook (Review Changes view AND Published rules view).
 
 - [ ] **Step 3: Confirm**
 
@@ -1505,17 +1602,42 @@ If the row landed in **prod** Supabase, STOP — preview env vars are misconfigu
 
 - [ ] **Step 4 [agent]: Confirm via the smoke script (against preview URL, dev DB)**
 
+For preview, check 10a (admin export with correct token) will fail because preview env intentionally has no `ADMIN_EXPORT_TOKEN`. Use the `--skip-admin-success` flag to skip 10a while still asserting 10b/10c return 401:
+
 ```powershell
 node scripts/smoke-production.mjs `
   --url $previewUrl `
-  --admin-token "any-token-will-401-on-admin" `
+  --admin-token "any-token-because-preview-has-none" `
+  --skip-admin-success `
   --supabase-url $env:NEXT_PUBLIC_SUPABASE_URL `
   --supabase-anon-key $env:NEXT_PUBLIC_SUPABASE_ANON_KEY `
   --supabase-service-role-key $env:SUPABASE_SERVICE_ROLE_KEY `
   --expected-supabase-ref "wqswamtcppjmkwykukjp"
 ```
 
-Expect: most checks pass; check 10b/10c (admin export) returns 401 (because preview doesn't have ADMIN_EXPORT_TOKEN); R1 sentry skips (no SENTRY_API_TOKEN provided).
+The smoke script needs to support `--skip-admin-success`. Add to Task 5 step 1 the following: a new boolean arg `"skip-admin-success": { type: "boolean", default: false }`, and modify `checkAdminExportAuth()` to skip the 200-token branch when set:
+
+```javascript
+async function checkAdminExportAuth() {
+  if (!args["skip-admin-success"]) {
+    const ok = await fetch(`${URL}/api/admin/feedback/export`, {
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    if (ok.body) await ok.body.cancel();
+    check("10a admin-ok",
+      ok.status === 200 && (ok.headers.get("content-type") ?? "").startsWith("text/csv"),
+      `status=${ok.status} ct=${ok.headers.get("content-type")}`);
+  } else {
+    check("10a admin-ok-skipped", true, "skipped via --skip-admin-success (preview env)");
+  }
+  // 10b + 10c unchanged
+  // ...
+}
+```
+
+(Apply this edit when implementing Task 5 — added here for cross-reference.)
+
+Expect: most checks pass; 10a skipped; 10b/10c return 401; R1 sentry skips (no SENTRY_API_TOKEN provided).
 
 - [ ] **Step 5 [agent+human]: Confirm**
 
@@ -1529,15 +1651,17 @@ Both confirm: preview isolation verified, smoke passes against preview. Move on.
 
 - [ ] **Step 1 [agent]: Open PR for Phase 7a code work**
 
+PowerShell can't parse bash heredoc syntax. Write the PR body to a temp file and pass `--body-file`:
+
 ```powershell
-gh pr create --title "feat(7a): production launch readiness — code track" --body "$(cat <<'EOF'
+$body = @"
 ## Summary
 - Node 24 upgrade (.nvmrc + engines + @types/node + CI workflow)
-- New `/api/_internal/sentry-test` endpoint (Bearer-gated)
-- New `scripts/smoke-production.mjs` (15 blocking + R1 release-evidence)
-- New `scripts/smoke-cleanup.mjs` (async sweeper)
+- New ``/api/_internal/sentry-test`` endpoint (Bearer-gated)
+- New ``scripts/smoke-production.mjs`` (15 blocking + R1 release-evidence)
+- New ``scripts/smoke-cleanup.mjs`` (async sweeper)
 - README env-vars docs expanded
-- `docs/superpowers/runbooks/launch-rollback.md` operational quick-ref
+- ``docs/superpowers/runbooks/launch-rollback.md`` operational quick-ref
 
 Track B infra work (Vercel project, Supabase prod, env vars, firewall) is done out-of-band; this PR is the code+docs portion.
 
@@ -1549,8 +1673,10 @@ Track B infra work (Vercel project, Supabase prod, env vars, firewall) is done o
 - [ ] (After merge) Smoke passes against Production deploy
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-EOF
-)"
+"@
+$body | Out-File -FilePath pr-body.tmp.md -Encoding utf8
+gh pr create --title "feat(7a): production launch readiness — code track" --body-file pr-body.tmp.md
+Remove-Item pr-body.tmp.md
 ```
 
 - [ ] **Step 2 [human]: Review + merge**
@@ -1683,8 +1809,8 @@ Within 24h of the smoke's `feedback_submitted` event (from check 07/08):
 - [ ] **Step 3 [agent]: Commit screenshots**
 
 ```powershell
-mkdir -p docs/superpowers/runbooks/screenshots
-# Copy the screenshot file into that folder
+New-Item -ItemType Directory -Force -Path docs\superpowers\runbooks\screenshots | Out-Null
+# Copy the screenshot file into that folder (drag-drop or Copy-Item)
 git add docs/superpowers/runbooks/screenshots/vercel-analytics-feedback-submitted.png
 git commit -m "docs(runbook): Vercel Analytics R3 evidence screenshot"
 ```
@@ -1720,15 +1846,90 @@ Vercel Dashboard → Deployments → most recent → "Promote to Production".
 
 - [ ] **Step 5 [agent]: Record the drill**
 
+Append a "Drill log" section to `docs/superpowers/runbooks/launch-rollback.md` noting the date, the two SHAs involved (no-op SHA + previous known-good SHA), and the verifier name.
+
 ```powershell
+$ts = Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz"
 git add docs/superpowers/runbooks/launch-rollback.md
-# Append a "Drill log" section noting the date + SHAs involved
-git commit -m "docs(runbook): record rollback drill on $(date -Iseconds)"
+git commit -m "docs(runbook): record rollback drill on $ts"
 ```
 
 ---
 
-## Task 22 [agent]: Update CLAUDE.md with Phase 7a architecture
+## Task 22 [agent+human]: R2 sourcemap evidence
+
+Sentry source-map upload is build-time and must be verified for stack-trace symbolication to work.
+
+- [ ] **Step 1 [agent]: Inspect prod build logs**
+
+Vercel Dashboard → Project → Deployments → latest prod deployment → "Build Logs". Search for "Sentry" or "sourcemaps". Expect a line like `Uploading source maps...` followed by `Successfully uploaded X file(s)`.
+
+If no such line: the Sentry webpack/turbopack plugin is misconfigured. STOP and report.
+
+Save the relevant log snippet (or screenshot) to `docs/superpowers/runbooks/screenshots/sentry-sourcemap-upload.png`.
+
+- [ ] **Step 2 [agent]: Verify .map files are NOT publicly served**
+
+```powershell
+# Pick any chunk file name from the deployed app (view-source on the prod page)
+$chunkUrl = "$env:PROD_URL/_next/static/chunks/main-abc123.js.map"
+$resp = Invoke-WebRequest -Uri $chunkUrl -SkipHttpErrorCheck
+Write-Host "status=$($resp.StatusCode)"
+```
+
+Expected: 404 or 403. If 200, sourcemaps are publicly served — Sentry-plugin's `sourcemaps.deleteSourcemapsAfterUpload: true` (Phase 6c) isn't working. Investigate.
+
+- [ ] **Step 3 [agent+human]: Confirm symbolication works on the R1 test event**
+
+From Task 18's smoke run, Sentry has the test event. Open it in the Sentry dashboard:
+
+1. Sentry → Issues → search for `phase-7a smoke: sentry pipeline verification`
+2. Open the event
+3. Verify the stack trace shows source-mapped file names (e.g., `app/api/_internal/sentry-test/route.ts:24`) instead of minified chunk paths (e.g., `_next/static/chunks/abc-123.js:1:42312`)
+
+If symbolication is broken, sourcemaps uploaded but the upload-association is wrong. Check Sentry → Releases → confirm a release exists matching the deployed commit SHA.
+
+- [ ] **Step 4 [agent]: Commit evidence**
+
+```powershell
+git add docs/superpowers/runbooks/screenshots/sentry-sourcemap-upload.png
+git commit -m "docs(runbook): R2 sourcemap upload evidence"
+```
+
+---
+
+## Task 23 [agent]: Collect remaining infra screenshots
+
+Per Tasks 13, 15: dashboard screenshots are part of the launch evidence. Gather them all in one place.
+
+- [ ] **Step 1: Required screenshots**
+
+Save each to `docs/superpowers/runbooks/screenshots/`:
+
+| File | Source |
+|---|---|
+| `storage-lifecycle.png` | Supabase → Storage → cv-uploads → lifecycle rule view (from Task 13) |
+| `anthropic-spend-cap.png` | Anthropic console → Settings → Billing → Spend Limits (from Task 15) |
+| `vercel-firewall-rules-published.png` | Vercel → Firewall → Custom Rules (showing both rate-limit rules in "Published" state, from Task 15) |
+| `supabase-backups.png` | Supabase → Database → Backups (showing daily backups enabled, from Task 11) |
+| `vercel-env-vars-prod-scope.png` | Vercel → Project → Env Vars (showing all required vars scoped to Production, from Task 14). **Redact values before screenshotting.** |
+| `vercel-analytics-feedback-submitted.png` | Vercel → Analytics → Custom Events (from Task 20, already added if Task 20 ran first) |
+| `sentry-sourcemap-upload.png` | From Task 22 |
+
+- [ ] **Step 2: Commit**
+
+```powershell
+git add docs/superpowers/runbooks/screenshots/*.png
+git commit -m "docs(runbook): infra setup screenshots for launch evidence
+
+Storage lifecycle, Anthropic spend cap, Vercel Firewall rules,
+Supabase backups, Vercel env scope (values redacted), Vercel
+Analytics event, Sentry sourcemap upload."
+```
+
+---
+
+## Task 24 [agent]: Update CLAUDE.md with Phase 7a architecture
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -1778,7 +1979,7 @@ git push origin main
 - [x] No `<placeholder>` markers
 - [x] Code blocks are complete (no `// ...rest`)
 - [x] Spec coverage:
-  - [x] §1 Goal — Tasks 1–22 cover it
+  - [x] §1 Goal — Tasks 1–24 cover it
   - [x] §2 Decisions — Tasks 1, 4, 14, 15 (Node 24), Task 13 (#12 SMTP), Task 14 (#8 preview), Task 13 (#10 cleanup), Task 11 (#15 entry URL via /chat in smoke check 02)
   - [x] §3 Env-var manifest — Task 14 (set) + Task 9 (docs)
   - [x] §4 Supabase prod setup — Tasks 11, 12, 13
@@ -1788,7 +1989,7 @@ git push origin main
   - [x] §7 Manual journey — Task 19
   - [x] §8 Rollback runbook — Task 10 (doc) + Task 21 (drill)
   - [x] §9 New code surface — Tasks 3, 4–7, 8, 10
-  - [x] §10 Definition of done — all gates traceable to Tasks 1–22
+  - [x] §10 Definition of done — all gates traceable to Tasks 1–24
   - [x] §11 Out of scope — explicit "Not modified" list in file map
   - [x] §12 Risks — runbook covers operational risks; smoke covers technical risks
 - [x] Type/name consistency: `smokeUserId`, `SMOKE_RUN_ID`, `ADMIN_EXPORT_TOKEN`, `SENTRY_API_TOKEN` used consistently across tasks
