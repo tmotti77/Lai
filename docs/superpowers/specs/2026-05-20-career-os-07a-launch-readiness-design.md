@@ -28,9 +28,12 @@ A green-pass on 7a means every code path that runs against deployed infrastructu
 | 7 | Node version | **Upgrade `.nvmrc` 20 → 24** (Node 20 EOL 2026-04-30) | Mandatory before launch. Vercel supports Node 24 LTS for builds + functions. Run full suite under 24 before deploy. |
 | 8 | Preview environment isolation | **Preview uses dev/staging Supabase; ADMIN_EXPORT_TOKEN may be omitted in preview** | Production env scope contains prod Supabase + admin token; preview scope must not contain prod-mutating credentials. ADMIN_EXPORT_TOKEN is intentionally NOT in `lib/env.ts`'s required list — admin export returns 401 in preview, the desired behavior. |
 | 9 | Smoke vs release evidence | **Split into blocking smoke (15 checks) + release evidence (3 gates, non-blocking)** | Sentry events / Vercel Analytics dashboards have async indexing — forcing them into blocking smoke creates flakiness. Sentry verified via Events API polling (release evidence). Vercel Analytics manually verified. |
-| 10 | Cleanup strategy | **Tag rows with `metadata.smoke_run_id`; inline `try/finally` + async sweeper script** | Inline cleanup catches the common case. Async sweeper catches the case where inline cleanup fails. Never depend on rollback to clean up test residue. |
+| 10 | Cleanup strategy | **Track the anonymous `user_id` created at smoke start; cascade-delete from `users` (FK cascades drop dependent rows). Plus async sweeper for stale anonymous users older than 24h with no chat activity.** | Middleware creates `users` + `anonymous_sessions` BEFORE any tagged row is written; `metadata.smoke_run_id` only reaches rows our routes insert. Cascading from the smoke user_id catches everything reliably. The async sweeper is the fallback if inline cleanup fails. |
 | 11 | Database rollback posture | **Explicit human decision, never automatic** | App rollback (Vercel promote previous SHA) is instant + idempotent. DB rollback requires PITR (not enabled in 7a) OR manual SQL OR forward-fix migration. No destructive SQL without second reviewer. |
 | 12 | Custom SMTP for auth emails | **Decision deferred to deploy time**: configure custom SMTP OR explicitly accept Supabase default for closed beta + smoke magic-link click-through | Default is fine for closed beta; custom SMTP recommended pre-public-launch (deliverability). |
+| 13 | AI abuse/cost guard for anonymous chat | **Config-only defenses in 7a**: (a) Anthropic console spend cap configured (hard cap); (b) Vercel Firewall rate limits on `/api/chat` (e.g., 30 req/min/IP); (c) accept-and-document that closed beta = trusted-tester audience. Code-level rate limiting deferred to 7b. | Anonymous AI endpoints + closed beta = real cost exposure if abused. Config caps + IP rate limits cover the bulk of the risk without new code; harder defenses (per-user quotas, captcha) wait for 7b. |
+| 14 | Content Security Policy | **Deferred to 7b (security hardening pass)**. 7a verifies existing security headers (`x-content-type-options: nosniff` on admin export) but does NOT introduce CSP. | A real CSP requires inventory of all script/style/img/connect sources + careful Vercel + Next.js integration. Out of scope for "can app receive prod traffic safely" — defer to 7b legal/hardening alongside cookie banner work. |
+| 15 | Beta entry URL | **Closed-beta entry is `/chat`** (not `/`). `/` remains the public "coming soon" page until 7c. | Avoids a "production redirect" code change in 7a; testers receive `/chat` URLs directly. Public `/` redirect to app is a 7c growth-task. |
 
 ---
 
@@ -114,39 +117,101 @@ ADMIN_EXPORT_TOKEN             # openssl rand -hex 32 — fresh per environment
 
 Reproducible CI-runnable verification script. Runs against any deployed URL. Exits 0 on all-pass, non-zero with JSON output on failure.
 
+**Required env (passed via flags or env vars, never printed):**
+
 ```
-node scripts/smoke-production.mjs --url https://career-os.app --admin-token "$ADMIN_EXPORT_TOKEN"
+node scripts/smoke-production.mjs \
+  --url https://career-os.app \
+  --admin-token "$ADMIN_EXPORT_TOKEN" \
+  --supabase-url "$NEXT_PUBLIC_SUPABASE_URL" \
+  --supabase-anon-key "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  --supabase-service-role-key "$SUPABASE_SERVICE_ROLE_KEY" \
+  --expected-supabase-ref "<prod-ref>" \
+  --sentry-org "$SENTRY_ORG" \
+  --sentry-project "$SENTRY_PROJECT" \
+  --sentry-api-token "$SENTRY_API_TOKEN"   # read-only events:read scope; separate from SENTRY_AUTH_TOKEN
 ```
 
 | # | Check | Pass criteria |
 |---|---|---|
-| 1 | App boots + RTL | `GET /` → 200, HTML contains `<html dir="rtl" lang="he">` |
-| 2 | Anonymous cookie attrs | `Set-Cookie: co_anon=...` present with `Secure`, `HttpOnly`, `SameSite` attrs; cookie persists across one follow-up request |
-| 3 | Static pages render | `GET /privacy` + `GET /terms` → 200, expected DOM marker (not full text match) |
-| 4 | Chat reachability | Tiny deterministic Hebrew prompt to `POST /api/chat`; abort stream after first valid chunk. Without consent → 403; with consent → 200 + stream; never 500. |
-| 5 | Consent endpoint | `POST /api/consent {processing,disclaimer}` → 204; followup chat unblocked |
-| 6 | Recommendations shape | `POST /api/recommendations` returns `recommendation_id` + `thumbs` map (shape only — empty values OK for fresh user) |
-| 7 | Thumb writes | `POST /api/feedback` thumb, row appears in Supabase tagged with `metadata.smoke_run_id = <uuid>` |
-| 8 | NPS idempotency | NPS submit → 200; double-submit → `{already:true}` |
+| 1 | App boots + RTL | `GET /` → 200, HTML contains `<html dir="rtl" lang="he">`. (Coming-soon body OK for 7a; entry is `/chat`.) |
+| 2 | Anonymous cookie attrs | `GET /chat` → first response includes `Set-Cookie: co_anon=...` with `Secure`, `HttpOnly`, `SameSite=Lax`; cookie persists across one follow-up request |
+| 3 | Static pages render | `GET /privacy` + `GET /terms` → 200, contain stable DOM marker (`<main>` or `<h1>` text from the page, not full prose match) |
+| 4 | Chat reachability | Tiny deterministic Hebrew prompt to `POST /api/chat`; abort stream after first valid chunk; short timeout (8s). Without consent → 403; with consent → 200 + ≥1 stream chunk; never 500. |
+| 5 | Consent endpoint | `POST /api/consent {}` (body ignored by current contract) → 200 `{ok: true}`. `GET /api/consent` → `{processing: true, disclaimer: true}`. Followup chat unblocked. |
+| 6 | Recommendations shape | `POST /api/recommendations` → JSON with keys `recommendation_id` + `thumbs` map (shape-only assertion — empty `paths`/`rankings` arrays OK for fresh user) |
+| 7 | Thumb writes | `POST /api/feedback` thumb body → 200 `{ok:true}`; service-role SELECT confirms row exists under the smoke `user_id` (NOT by smoke_run_id which only lives in `metadata`) |
+| 8 | NPS idempotency | NPS submit → 200 `{ok:true}`; immediate double-submit → 200 `{ok:true, already:true}` |
 | 9 | NPS dismiss | `POST /api/feedback/nps-dismiss` → 204 |
-| 10 | Admin export auth matrix | With correct Bearer + `since` filter scoped to smoke_run_id window → 200 CSV (test data only, no real-user data leakage); wrong token → 401; no token → 401 |
-| 11 | Migration check (read-only) | `information_schema` query via service-role: `feedback` table exists; `users.nps_eligibility_first_at` column exists. NO writes. |
-| 12 | Storage bucket | `cv-uploads` bucket exists, `public === false`, anon SELECT fails |
-| 13 | Security headers | `x-content-type-options: nosniff` on admin export; `Content-Security-Policy` present on `/`; cookies have `Secure` + `SameSite` |
-| 14 | Env sanity | Required secrets present (existence-check only — never print values); `NEXT_PUBLIC_SUPABASE_URL` matches expected prod project ref |
-| 15 | Cleanup (idempotent) | Every row tagged `metadata.smoke_run_id`; inline `try/finally` deletes by smoke_run_id; logs **row counts only**, never row payloads; separate async sweeper script catches stale residue |
+| 10 | Admin export auth matrix | With correct Bearer → 200 with `content-type: text/csv` (verify status + header only; **do NOT inspect CSV payload — concurrent beta traffic could leak via the script's logs**). Wrong token → 401. No token → 401. |
+| 11 | Migration check (read-only) | `information_schema.columns` query via service-role: `feedback` table exists with expected column count; `users.nps_eligibility_first_at` column exists. NO writes. |
+| 12 | Storage bucket | Via storage admin API: `cv-uploads` bucket exists, `public === false`. Anon-client `list` against bucket fails. |
+| 13 | Security headers | `x-content-type-options: nosniff` on admin export response; cookies on `/chat` have `Secure` + `SameSite`. **CSP deferred to 7b — do not assert.** |
+| 14 | Env sanity | Required secrets present (existence-check only — never print values). `NEXT_PUBLIC_SUPABASE_URL` host matches `<expected-supabase-ref>.supabase.co`. |
+| 15 | Cleanup (idempotent) | `try/finally` cascade-DELETE from `users WHERE id = <smoke_user_id>` — FKs cascade to conversations, messages, feedback, recommendations, plans, plan_tasks, consents, anonymous_sessions, interview_sessions, cv_uploads, etc. If CV uploads were exercised, also delete from `cv-uploads` storage by user_id prefix. Logs **row counts only**, never payloads. Separate async sweeper (`scripts/smoke-cleanup.mjs`) deletes anonymous users with `is_anonymous=true AND created_at < now() - 24h AND no chat activity`. |
 
 **Release evidence** (separate gates, non-blocking for deploy promote):
 
 | # | Check | Method | Window |
 |---|---|---|---|
-| R1 | Sentry pipeline | `POST /api/_internal/sentry-test` (Bearer-gated, new endpoint) calls `Sentry.captureException` + `flush()` + returns `eventId` → smoke script polls Sentry Events API for that `eventId` | 2–5 min |
-| R2 | Sourcemaps uploaded | **Build-time verification**: confirm sourcemap upload step exited 0 in build logs; verify no public `.map` files served from prod | Build, not smoke |
-| R3 | Vercel Analytics dashboard | **Manual evidence only** — capture screenshot of dashboard showing the `feedback_submitted` event | 24h post-deploy |
+| R1 | Sentry pipeline | `POST /api/_internal/sentry-test` (gated by **reused `ADMIN_EXPORT_TOKEN`** — no new env var) calls `Sentry.captureException(new Error("smoke"))` + `Sentry.flush(5000)` + returns `{eventId}` → smoke script polls `GET https://sentry.io/api/0/projects/{org}/{project}/events/?query=event.id:{eventId}` using `SENTRY_API_TOKEN` (read scope) with 2–5 min retry window | 2–5 min |
+| R2 | Sourcemaps uploaded | **Build-time verification**: confirm sourcemap upload step exited 0 in Vercel build logs; verify no public `.map` files served from prod (`curl https://career-os.app/_next/static/chunks/<chunk>.js.map` → 404 or 403) | Build, not smoke |
+| R3 | Vercel Analytics dashboard | **Manual evidence only** — capture screenshot of dashboard showing the `feedback_submitted` event | Within 24h post-deploy; **NOT a promote gate** |
 
 **Implementation note**: Vercel Analytics has no stable public query API (per their docs: dashboard-viewable + exportable only). Treat as manual evidence.
 
 **Why split blocking vs evidence**: blocking smoke must be fast + reliable so any deploy attempt can run it. Release evidence has slower windows (Sentry indexing ~30-120s; Vercel Analytics dashboard ~minutes) — putting them in blocking smoke creates false negatives that delay safe deploys.
+
+### 6.1 Worked examples (representative requests + responses)
+
+```bash
+# Check #4 — chat reachability (with consent already accepted)
+curl -X POST "$URL/api/chat" \
+  -H "content-type: application/json" \
+  -H "cookie: co_anon=$SMOKE_TOKEN" \
+  -d '{"messages":[{"role":"user","content":"שלום"}],"conversationId":"<smoke-conv-id>"}' \
+  --max-time 8
+# Expect: 200 with text/event-stream body; abort after first chunk
+
+# Check #5 — consent
+curl -X POST "$URL/api/consent" \
+  -H "content-type: application/json" \
+  -H "cookie: co_anon=$SMOKE_TOKEN" -d '{}'
+# Expect: 200 {"ok": true}
+
+curl "$URL/api/consent" -H "cookie: co_anon=$SMOKE_TOKEN"
+# Expect: 200 {"processing": true, "disclaimer": true}
+
+# Check #7 — thumb feedback
+curl -X POST "$URL/api/feedback" \
+  -H "content-type: application/json" \
+  -H "cookie: co_anon=$SMOKE_TOKEN" \
+  -d '{"kind":"thumb","surface":"recommendations","target_type":"recommendation_occupation","target_id":"<rec-id>:<occupation-id>","thumbs_value":1,"metadata":{"smoke_run_id":"<uuid>"}}'
+# Expect: 200 {"ok": true}
+
+# Check #8 — NPS double-submit idempotency
+curl -X POST "$URL/api/feedback" -H "content-type: application/json" -H "cookie: co_anon=$SMOKE_TOKEN" \
+  -d '{"kind":"nps","nps_score":9,"nps_trigger":"pdf_download","comment_he":""}'
+# First: 200 {"ok": true}
+# Second (identical body): 200 {"ok": true, "already": true}
+
+# Check #10 — admin export auth matrix (status + content-type only; never inspect body)
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
+  "$URL/api/admin/feedback/export" -H "authorization: Bearer $ADMIN_EXPORT_TOKEN"
+# Expect: 200 text/csv; charset=utf-8
+
+curl -s -o /dev/null -w "%{http_code}\n" "$URL/api/admin/feedback/export"
+# Expect: 401
+
+# Release evidence R1 — Sentry test endpoint
+curl -X POST "$URL/api/_internal/sentry-test" -H "authorization: Bearer $ADMIN_EXPORT_TOKEN"
+# Expect: 200 {"eventId": "<32-hex-chars>"}
+
+# Then poll Sentry Events API for the returned eventId:
+curl "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/events/?query=event.id:$EVENT_ID" \
+  -H "authorization: Bearer $SENTRY_API_TOKEN"
+# Retry every 15s up to 5 min; success when results array is non-empty
+```
 
 ---
 
@@ -154,7 +219,7 @@ node scripts/smoke-production.mjs --url https://career-os.app --admin-token "$AD
 
 Run this **after** the scripted smoke suite passes against the production deployment. Use a fresh browser profile or incognito session and record the deployment URL, commit SHA, tester name, browser, device/viewport, and timestamp.
 
-1. Start as an anonymous visitor on `/`. Confirm the first screen loads quickly, Hebrew copy renders right-to-left, and no logged-in-only UI appears.
+1. Start as an anonymous visitor on **`/chat`** (the closed-beta entry — `/` is still the "coming soon" landing page until 7c). Confirm the first screen loads quickly, Hebrew copy renders right-to-left, and no logged-in-only UI appears.
 2. Accept consent. Confirm the consent state persists after refresh and that chat is no longer blocked.
 3. Complete at least three chat turns. Use realistic Hebrew input. Confirm streamed responses appear incrementally, preserve RTL direction, and do not show raw model/system errors.
 4. Continue into the assessment flow. Verify progress, validation, back/forward behavior, and that dynamic Hebrew content remains aligned and readable.
@@ -227,15 +292,22 @@ Notify the release owner, engineering lead, product owner, and anyone monitoring
 ## 9. New code surface (small — most work is configuration)
 
 ```
-scripts/smoke-production.mjs                Reproducible smoke runner (15 blocking + 1 polling release-evidence check)
-scripts/smoke-cleanup.mjs                   Async sweeper for stale smoke_run_id rows
-app/api/_internal/sentry-test/route.ts      Bearer-gated test endpoint — captures + flushes one error, returns eventId
+scripts/smoke-production.mjs                Reproducible smoke runner (15 blocking + 1 polling release-evidence check R1)
+scripts/smoke-cleanup.mjs                   Async sweeper: anonymous users older than 24h with no chat activity
+app/api/_internal/sentry-test/route.ts      ADMIN_EXPORT_TOKEN-gated; calls captureException + flush(5000) + returns {eventId}
 
 .nvmrc                                       20 → 24
-package.json                                 engines.node update
+package.json                                 engines.node update + @types/node bump to ^24
+.github/workflows/test.yml                   CI runner Node version 24 (currently 20)
 README.md                                    Production env-var docs expanded (currently only ADMIN_EXPORT_TOKEN documented)
 docs/superpowers/runbooks/launch-rollback.md  Operational runbook extracted from §8 for quick reference
 ```
+
+**Explicitly NOT added in 7a code:**
+- No CSP middleware/headers work (deferred to 7b per decision #14)
+- No code-level rate limiting (config-only defenses per decision #13)
+- No `/api/consent` contract changes (smoke matches current `200 {ok:true}` shape)
+- No root URL redirect (closed-beta enters at `/chat` per decision #15)
 
 No new product code. No matching engine / AI prompt / UI changes. Phase 7a is purely deployment + verification.
 
@@ -243,22 +315,32 @@ No new product code. No matching engine / AI prompt / UI changes. Phase 7a is pu
 
 ## 10. Definition of done
 
+**Promote gate** — must pass before promoting a deploy to production traffic:
+
 | Gate | How verified |
 |---|---|
-| `.nvmrc` + `engines` + Vercel set to Node 24 | Build logs show Node 24; CI workflow updated |
+| `.nvmrc=24` + `engines.node` + `@types/node@^24` + CI workflow Node 24 + Vercel project Node 24 | Build logs show Node 24; CI runs under 24; `package.json` diff |
 | All 11 migrations applied to `career-os-prod` | `information_schema` query confirms tables + columns |
 | All env vars in §3 manifest set in Vercel Production scope | Vercel dashboard verification |
 | Preview env isolated (no prod credentials) | Preview deploy of branch → confirm `POST /api/feedback` doesn't hit prod tables |
+| Anthropic console spend cap configured (config decision #13) | Anthropic dashboard screenshot in runbook |
+| Vercel Firewall rate limits on `/api/chat` configured (decision #13) | Firewall rules screenshot in runbook |
 | `npx tsc --noEmit` clean | CI |
-| `npm test` green | CI (includes new smoke-runner unit tests if any) |
+| `npm test` green under Node 24 | CI |
 | `npm run build` green under Node 24 | CI |
 | `scripts/smoke-production.mjs` exits 0 against deployed URL | Manual + CI nightly |
-| Sentry pipeline verified | `/api/_internal/sentry-test` returns eventId visible in Sentry within 5 min |
 | Sourcemaps uploaded at build time | Build log inspection; no public `.map` files |
-| Vercel Analytics dashboard shows `feedback_submitted` event | Manual screenshot ≤ 24h post-deploy |
 | Manual user-journey passes per §7 | Tester checklist signed off |
 | Rollback runbook dry-run completed | Promote-previous-SHA exercise recorded |
 | README env-var docs updated | PR diff review |
+| Supabase `cv-uploads` 30-day lifecycle policy configured | Dashboard screenshot in runbook |
+
+**Phase-close evidence** — non-blocking for any single deploy promote; needed to close out 7a phase:
+
+| Gate | How verified |
+|---|---|
+| Sentry pipeline verified (R1) | `/api/_internal/sentry-test` returns eventId visible via Events API within 2–5 min |
+| Vercel Analytics dashboard shows test `feedback_submitted` event (R3) | Manual screenshot ≤ 24h post-deploy |
 
 ---
 
@@ -293,3 +375,6 @@ No new product code. No matching engine / AI prompt / UI changes. Phase 7a is pu
 | Bad migration corrupts production data | §8.2 explicit human decision; pre-deploy backup confirmed; second-reviewer rule on destructive SQL |
 | Magic-link auth emails not delivered | Smoke includes magic-link click-through test; custom SMTP recommended pre-public-launch |
 | Node 20 EOL between now and deploy | §2 #7 mandates Node 24 upgrade as gated task; full suite runs under 24 before deploy |
+| Anonymous AI chat abused/spend exploded | §2 #13: Anthropic console hard spend cap + Vercel Firewall rate limits + closed-beta trusted audience. Code-level per-user quotas in 7b. |
+| Smoke script accidentally logs CSV payload → leaks real beta-user data | §6 #10 hardened: assert status + content-type only, never inspect body. Smoke logs row counts, never row payloads. |
+| Smoke script orphans anonymous user rows | §6 #15: cascade-DELETE from `users` covers all FK-linked tables; `scripts/smoke-cleanup.mjs` sweeper catches stale residue |
