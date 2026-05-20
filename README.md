@@ -24,7 +24,23 @@ npx tsc --noEmit     # type check
 
 ## Environment variables
 
-- `ADMIN_EXPORT_TOKEN` (optional, recommended for production): Bearer token for the admin feedback CSV export endpoint. Generate with `openssl rand -hex 32`. Without this set, `GET /api/admin/feedback/export` always returns 401.
+Required in Production scope (Vercel Project → Environment Variables → Production):
+
+- `ANTHROPIC_API_KEY` — Anthropic Claude API key from console.anthropic.com
+- `ANTHROPIC_MODEL` — Exact Claude model ID (verify current ID before setting)
+- `NEXT_PUBLIC_SUPABASE_URL` — `https://<prod-ref>.supabase.co`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase project anon/publishable key
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase service-role key (server-only)
+- `NEXT_PUBLIC_SITE_URL` — Exact production host, no trailing slash
+- `SENTRY_DSN` — Sentry DSN for the prod project
+- `SENTRY_AUTH_TOKEN` — Sentry auth token for sourcemap upload at build time
+- `SENTRY_ORG` — Sentry organization slug
+- `SENTRY_PROJECT` — Sentry project slug
+- `ADMIN_EXPORT_TOKEN` — Bearer token for admin feedback CSV export (also gates `/api/_internal/sentry-test` for smoke). Generate with `openssl rand -hex 32`. Fresh per environment.
+
+Required in Preview scope: Use dev/staging Supabase credentials (NOT prod). `ADMIN_EXPORT_TOKEN` may be omitted in Preview — admin export will return 401, which is the desired behavior.
+
+For local development, copy `.env.example` to `.env.local` and fill in values.
 
 ## Database migrations
 
