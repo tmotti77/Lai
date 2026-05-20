@@ -11,6 +11,31 @@ import { profileHash } from "@/lib/matching/hash";
 import { generateExplanations } from "@/lib/ai/prompts/explanations";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { track } from "@/lib/analytics";
+
+async function loadThumbsForRecommendation(
+  svc: ReturnType<typeof createServiceClient>,
+  userId: string,
+  recommendationId: string,
+): Promise<Record<string, -1 | 1>> {
+  const { data } = await svc
+    .from("feedback")
+    .select("target_id, thumbs_value")
+    .eq("user_id", userId)
+    .eq("surface", "recommendations")
+    .eq("target_type", "recommendation_occupation")
+    .like("target_id", `${recommendationId}:%`)
+    .not("thumbs_value", "is", null);
+  return Object.fromEntries(
+    (data ?? [])
+      .filter((r) => r.thumbs_value === 1 || r.thumbs_value === -1)
+      .map((r) => [r.target_id, r.thumbs_value as -1 | 1])
+  );
+}
+
+function dimensionCount(weightsUsed: Partial<Record<string, number>>): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+  return Object.keys(weightsUsed).length as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,12 +78,20 @@ export async function POST(request: NextRequest) {
     if (!force) {
       const cached = await getCached(internalUserId, hash);
       if (cached) {
+        const svc = createServiceClient();
+        const thumbs = await loadThumbsForRecommendation(svc, internalUserId, cached.id);
+        track("recommendations_generated", {
+          cache_hit: true,
+          dimension_count: dimensionCount(cached.rankings[0]?.weights_used ?? {}),
+        });
         return Response.json({
           rankings: cached.rankings,
           paths: cached.paths,
           prose: cached.prose,
           cached: true,
           generated_at: cached.generatedAt,
+          recommendation_id: cached.id,
+          thumbs,
         });
       }
     }
@@ -81,11 +114,32 @@ export async function POST(request: NextRequest) {
       prose,
     });
 
+    const svc = createServiceClient();
+    const { data: recRow } = await svc
+      .from("recommendations")
+      .select("id")
+      .eq("user_id", internalUserId)
+      .eq("profile_hash", hash)
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    const recommendationId = recRow!.id;
+    // Fresh recommendations have no thumbs yet
+    const thumbs: Record<string, -1 | 1> = {};
+
+    track("recommendations_generated", {
+      cache_hit: false,
+      dimension_count: dimensionCount(rankings[0]?.weights_used ?? {}),
+    });
+
     return Response.json({
       rankings: rankings.slice(0, 10),
       paths,
       prose,
       cached: false,
+      recommendation_id: recommendationId,
+      thumbs,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

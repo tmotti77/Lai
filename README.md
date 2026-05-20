@@ -22,6 +22,10 @@ npm run db:types     # regenerate Supabase types (requires `supabase login` + `s
 npx tsc --noEmit     # type check
 ```
 
+## Environment variables
+
+- `ADMIN_EXPORT_TOKEN` (optional, recommended for production): Bearer token for the admin feedback CSV export endpoint. Generate with `openssl rand -hex 32`. Without this set, `GET /api/admin/feedback/export` always returns 401.
+
 ## Database migrations
 
 Migrations live in `supabase/migrations/<timestamp>_<name>.sql` and are git-tracked source of truth. To apply:

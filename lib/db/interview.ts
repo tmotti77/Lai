@@ -1,5 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
+import { track, questionCountBucket, type InterviewPersona } from "@/lib/analytics";
+import { markNpsEligibilityIfFirst } from "@/lib/db/nps";
 import type {
   InterviewSession,
   InterviewMessageRow,
@@ -113,7 +115,8 @@ export async function completeInterviewSession(
   payload: WrapUpPayload & { forcedWrap?: boolean },
 ): Promise<void> {
   const supa = createServiceClient();
-  const { error } = await supa
+
+  const { data, error } = await supa
     .from("interview_sessions")
     .update({
       completed_at: new Date().toISOString(),
@@ -124,6 +127,19 @@ export async function completeInterviewSession(
       feedback_per_question: payload.per_question,
       forced_wrap: payload.forcedWrap ?? false,
     })
-    .eq("id", sessionId);
+    .eq("id", sessionId)
+    .is("completed_at", null)
+    .select("user_id, persona, question_count, forced_wrap")
+    .maybeSingle();
+
   if (error) throw new Error(`completeInterviewSession: ${error.message}`);
+
+  if (data) {
+    track("interview_completed", {
+      persona: data.persona as InterviewPersona,
+      forced_wrap: data.forced_wrap ?? false,
+      question_count_bucket: questionCountBucket(data.question_count as number),
+    });
+    await markNpsEligibilityIfFirst(data.user_id as string, "interview_completed");
+  }
 }

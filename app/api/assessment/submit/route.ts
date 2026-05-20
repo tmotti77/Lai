@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { saveAssessment } from "@/lib/db/assessments";
+import { track } from "@/lib/analytics";
 import { scoreRiasec } from "@/lib/assessment/riasec/score";
 import { RIASEC_ITEMS_VERSION, RIASEC_ITEMS } from "@/lib/assessment/riasec/items";
 import { scoreBig5 } from "@/lib/assessment/big5/score";
@@ -100,6 +101,8 @@ export async function POST(req: Request) {
       scores,
       itemsVersion,
     });
+
+    track("assessment_completed", { type: submission.type });
 
     return Response.json({ id: saved.id, takenAt: saved.takenAt, scores });
   } catch (err) {

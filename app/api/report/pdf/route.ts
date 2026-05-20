@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
+import { requireConsent, NoConsentError } from "@/lib/consent";
 import { loadReportData } from "@/lib/pdf/loadReportData";
 import { renderReport } from "@/lib/pdf/render";
+import { track } from "@/lib/analytics";
+import { markNpsEligibilityIfFirst } from "@/lib/db/nps";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,12 +16,37 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     const internalUserId = await getOrCreateAnonymousUserId(user?.id);
 
+    try {
+      await requireConsent(internalUserId);
+    } catch (err) {
+      if (err instanceof NoConsentError) {
+        return Response.json({ error: "consent_required" }, { status: 403 });
+      }
+      throw err;
+    }
+
     const data = await loadReportData(internalUserId);
     if (!data) {
       return Response.json({ error: "no_recommendation" }, { status: 400 });
     }
 
     const buffer = await renderReport(data);
+
+    const svc = createServiceClient();
+    const { data: affectedRows, error: updateErr } = await svc
+      .from("users")
+      .update({ first_report_downloaded_at: new Date().toISOString() })
+      .eq("id", internalUserId)
+      .is("first_report_downloaded_at", null)
+      .select("id");
+
+    const isFirst = !updateErr && (affectedRows?.length ?? 0) === 1;
+    track("report_downloaded", { is_first: isFirst });
+
+    if (isFirst) {
+      await markNpsEligibilityIfFirst(internalUserId, "pdf_download");
+    }
+
     const dateStr = new Date(data.generatedAt).toISOString().slice(0, 10).replace(/-/g, "");
     const filename = `careeros-report-${dateStr}.pdf`;
 

@@ -165,6 +165,19 @@ Bundles 8 production-readiness bug fixes (Bucket A, surfaced by the 2026-05-17 d
 
 Architectural rule: any new mutation API route MUST call `requireConsent(userId)` after `getOrCreateAnonymousUserId` resolves. Any new SECURITY DEFINER function MUST land with an accompanying REVOKE EXECUTE migration. Hebrew strings ALWAYS in `lib/i18n/he.ts`.
 
+## Phase 6b architecture (feedback + analytics)
+
+Two telemetry layers: rich per-user analysis in Supabase (`feedback` table + joins), aggregate counters in Vercel Analytics (typed `lib/analytics.ts` allowlist, no user_id, no free text).
+
+- **`feedback` table** (single source of truth): one row per thumb or NPS submission. Discriminator via `surface` enum + `thumbs_value` / `nps_score` columns with `feedback_exactly_one_signal` CHECK. Partial unique indexes enforce "one current thumb per (user, target)" and "one NPS per user." `metadata` JSONB is the additive escape hatch.
+- **Thumbs surfaces**: recommendations (composite `target_id = ${recommendation_id}:${occupation_id}` — thumb is about THIS prose, not the abstract occupation) and interview-wrap. Chat thumbs deferred to Phase 6b.5 (requires `streamText({ messageMetadata })` protocol change to ride persisted DB id through the stream).
+- **NPS one-shot per user**, triggered by first of {PDF download, plan generated, interview completed}. State machine in `users` columns: `nps_eligibility_first_at`, `nps_submitted_at`, `nps_dismissed_at`, `nps_trigger_first`. Prompt renders iff `eligibility.show` (all server-side check).
+- **`lib/analytics.ts`** uses `after()` from `next/server` for fire-and-forget delivery (NOT `waitUntil()` — `after()` is the Next 15.1+ framework-native primitive). `EventName` union + `EventPropsMap` per-event prop type enforce no-PII at compile time.
+- **Atomic-transition pattern** used across 5 events for correctness: `is_first` for report download, NPS eligibility, NPS dismissal, interview completion, plan task transition. Always guarded UPDATE with RETURNING in one statement — no race window, no double-emit.
+- **Admin CSV export**: `GET /api/admin/feedback/export` Bearer-token via `timingSafeEqual` on UTF-8 byte buffers. Capped at 10k rows. CSV escape includes formula-injection guard (`=`, `+`, `-`, `@`, tab, CR prefixed with `'`). `x-content-type-options: nosniff`.
+
+Architectural rule: any new mutation route that produces an analytics event MUST call `track()` from `lib/analytics.ts`, NOT `@vercel/analytics/server` directly. The wrapper is the single PII gate. Any new feedback-row mutation MUST go through `POST /api/feedback` with the discriminated-union Zod schema; never write directly from other routes.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.

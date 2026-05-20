@@ -5,6 +5,7 @@ import type { RecommendationResult } from "@/lib/matching/types";
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type CachedRecommendation = {
+  id: string;
   rankings: RecommendationResult["rankings"];
   paths: RecommendationResult["paths"];
   prose: Record<string, string>;
@@ -18,7 +19,7 @@ export async function getCached(
   const svc = createServiceClient();
   const { data, error } = await svc
     .from("recommendations")
-    .select("rankings, paths, prose, generated_at")
+    .select("id, rankings, paths, prose, generated_at")
     .eq("user_id", userId)
     .eq("profile_hash", profileHash)
     .order("generated_at", { ascending: false })
@@ -31,6 +32,7 @@ export async function getCached(
   if (ageMs > CACHE_TTL_MS) return null;
 
   return {
+    id: data.id,
     rankings: data.rankings as never,
     paths: data.paths as never,
     prose: data.prose as never,
@@ -69,7 +71,7 @@ export async function getLatestRecommendationForUser(
   const svc = createServiceClient();
   const { data, error } = await svc
     .from("recommendations")
-    .select("rankings, paths, prose, generated_at")
+    .select("id, rankings, paths, prose, generated_at")
     .eq("user_id", userId)
     .order("generated_at", { ascending: false })
     .limit(1)
@@ -77,6 +79,7 @@ export async function getLatestRecommendationForUser(
   if (error) throw error;
   if (!data) return null;
   return {
+    id: data.id,
     rankings: data.rankings as never,
     paths: data.paths as never,
     prose: data.prose as never,

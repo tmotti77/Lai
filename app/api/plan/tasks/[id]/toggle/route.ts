@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
-import { toggleTask } from "@/lib/db/plans";
+import { toggleTaskDone, ForbiddenError } from "@/lib/db/plans";
 
 export const runtime = "nodejs";
 
@@ -25,11 +25,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const internalUserId = await getOrCreateAnonymousUserId(user?.id);
-    const result = await toggleTask({ userId: internalUserId, taskId: id, done: parsed.data.done });
-    return Response.json(result);
+    await toggleTaskDone(internalUserId, id, parsed.data.done);
+    return Response.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message === "forbidden") return Response.json({ error: "forbidden" }, { status: 403 });
+    if (err instanceof ForbiddenError) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
     return Response.json({ error: "toggle_failed" }, { status: 500 });
   }
 }

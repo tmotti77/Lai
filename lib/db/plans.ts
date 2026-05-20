@@ -1,7 +1,15 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
+import { track, type PlanTaskCategory } from "@/lib/analytics";
 import type { Plan, PlanTask, Archetype } from "@/lib/plan/types";
 import type { ComposedTask } from "@/lib/plan/compose";
+
+export class ForbiddenError extends Error {
+  constructor(message = "forbidden") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
 
 export async function createPlan(args: {
   userId: string;
@@ -75,30 +83,45 @@ export async function getLatestPlan(userId: string): Promise<Plan | null> {
   };
 }
 
-export async function toggleTask(args: {
-  userId: string;
-  taskId: string;
-  done: boolean;
-}): Promise<{ done: boolean; done_at: string | null }> {
-  const svc = createServiceClient();
-  // Verify ownership via the plan
-  const { data: taskRow, error: readErr } = await svc
-    .from("plan_tasks")
-    .select("plan_id, plans!inner(user_id)")
-    .eq("id", args.taskId)
-    .single();
-  if (readErr) throw readErr;
-  const plan = (taskRow as unknown as { plans: { user_id: string } }).plans;
-  if (plan.user_id !== args.userId) throw new Error("forbidden");
+export async function toggleTaskDone(
+  userId: string,
+  taskId: string,
+  done: boolean,
+): Promise<void> {
+  const supabase = createServiceClient();
 
-  const { data, error } = await svc
+  // Verify ownership via the plan JOIN
+  const { data: owned } = await supabase
     .from("plan_tasks")
-    .update({ done: args.done, done_at: args.done ? new Date().toISOString() : null })
-    .eq("id", args.taskId)
-    .select("done, done_at")
-    .single();
-  if (error) throw error;
-  return { done: data.done, done_at: data.done_at };
+    .select("id, plans!inner(user_id)")
+    .eq("id", taskId)
+    .eq("plans.user_id", userId)
+    .maybeSingle();
+  if (!owned) throw new ForbiddenError();
+
+  if (done) {
+    // Guarded UPDATE: WHERE done = false ensures event fires only on false→true transition
+    const { data } = await supabase
+      .from("plan_tasks")
+      .update({ done: true, done_at: new Date().toISOString() })
+      .eq("id", taskId)
+      .eq("done", false)
+      .select("category, day")
+      .maybeSingle();
+    if (data) {
+      track("plan_task_completed", {
+        category: data.category as PlanTaskCategory,
+        week: Math.ceil(data.day / 7) as 1 | 2 | 3 | 4 | 5,
+      });
+    }
+  } else {
+    // Guarded UPDATE: WHERE done = true avoids unnecessary writes on re-toggle
+    await supabase
+      .from("plan_tasks")
+      .update({ done: false, done_at: null })
+      .eq("id", taskId)
+      .eq("done", true);
+  }
 }
 
 function rowToTask(row: {

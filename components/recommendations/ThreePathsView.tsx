@@ -7,11 +7,15 @@ export function ThreePathsView({
   paths,
   occupations,
   prose,
+  recommendationId,
+  thumbsMap,
 }: {
   rankings: Ranking[];
   paths: Paths;
   occupations: Occupation[];
   prose: Record<string, string>;
+  recommendationId: string;
+  thumbsMap: Record<string, -1 | 1>;
 }) {
   const occMap = new Map(occupations.map((o) => [o.id, o]));
   const rankMap = new Map(rankings.map((r) => [r.occupation_id, r]));
@@ -46,6 +50,8 @@ export function ThreePathsView({
             ranking={ranking}
             occupation={occupation}
             prose={prose[id]}
+            recommendationId={recommendationId}
+            initialThumb={thumbsMap[`${recommendationId}:${id}`] ?? null}
           />
         );
       })}
