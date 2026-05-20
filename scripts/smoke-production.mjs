@@ -293,25 +293,119 @@ async function checkAdminExportAuth() {
   check("10c admin-noauth", noAuth.status === 401, `status=${noAuth.status}`);
 }
 
-async function main() {
-  await checkBootAndRtl();
-  await checkAnonCookie();
-  await checkStaticPages();
-  await checkChatReachable();
-  await checkConsent();
+// ── #11 Migration check (read-only) ──────────────────────────────
+async function checkMigrations() {
+  // PostgREST exposes the public schema for the supabase-js client. The cleanest
+  // way to assert a column exists is a SELECT limit(0) which returns no rows
+  // but still validates the column list at the query layer.
+  const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error: fbErr } = await svc
+    .from("feedback")
+    .select("id, surface, target_type, target_id, thumbs_value, nps_score, nps_trigger, comment_he, metadata, created_at, updated_at, user_id")
+    .limit(0);
+  check("11a migration-feedback", !fbErr, fbErr ? `error=${fbErr.message}` : "feedback table + 12 cols exist");
 
-  const recs = await checkRecommendationsShape();
-  const KNOWN_OCC_ID = "data-analyst";
-  if (recs?.recommendation_id) {
-    await checkThumbWrites(recs.recommendation_id, KNOWN_OCC_ID);
-  } else {
-    check("07 thumb-write", false, "no recommendation_id from check 6");
+  const { error: usrErr } = await svc
+    .from("users")
+    .select("id, nps_eligibility_first_at, nps_submitted_at, nps_dismissed_at, nps_trigger_first, first_report_downloaded_at")
+    .limit(0);
+  check("11b migration-users-nps", !usrErr, usrErr ? `error=${usrErr.message}` : "users NPS cols exist");
+}
+
+// ── #12 Storage bucket ───────────────────────────────────────────
+async function checkStorage() {
+  const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: bucket } = await svc.storage.getBucket("cv-uploads");
+  check("12a storage-private",
+    bucket && bucket.public === false,
+    `exists=${!!bucket} public=${bucket?.public}`);
+
+  // Anon-client list MUST return an explicit error (private bucket).
+  // An empty successful list is a false positive — bucket might be public-readable but empty.
+  const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { error } = await anon.storage.from("cv-uploads").list();
+  check("12b storage-anon-denied",
+    !!error,
+    error ? `denied (expected): ${error.message}` : "FAIL: anon list succeeded — bucket is not private");
+}
+
+// ── #13 Security headers (CSP deferred to 7b — not asserted) ─────
+async function checkSecurityHeaders() {
+  const r = await fetch(`${URL}/api/admin/feedback/export`, {
+    headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+  });
+  if (r.body) await r.body.cancel();
+  check("13 nosniff",
+    r.headers.get("x-content-type-options") === "nosniff",
+    `nosniff=${r.headers.get("x-content-type-options")}`);
+}
+
+// ── #14 Env sanity (existence-check only — never print values) ───
+async function checkEnvSanity() {
+  // Required args were already validated at the top of the script (exit 2 if missing).
+  // Here we assert NEXT_PUBLIC_SUPABASE_URL host matches the expected prod ref.
+  const required = ["url", "admin-token", "supabase-url", "supabase-anon-key",
+                    "supabase-service-role-key", "expected-supabase-ref"];
+  const missing = required.filter((k) => !args[k]);
+  check("14a env-args-present", missing.length === 0,
+    missing.length ? `missing=${missing.join(",")}` : "all-set");
+
+  const host = new URL(SUPABASE_URL).host;
+  const matches = host === `${EXPECTED_REF}.supabase.co`;
+  check("14b env-supabase-ref", matches,
+    `host=${host} expected=${EXPECTED_REF}.supabase.co`);
+}
+
+// ── #15 Cleanup (cascade-DELETE by user_id) ──────────────────────
+async function cleanup() {
+  if (!smokeUserId) {
+    check("15 cleanup-skipped", true, "no smoke user_id captured");
+    return;
   }
-  await checkNpsIdempotency();
-  await checkNpsDismiss();
-  await checkAdminExportAuth();
+  const svc = createClient(SUPABASE_URL, SUPABASE_SR_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error, count } = await svc
+    .from("users")
+    .delete({ count: "exact" })
+    .eq("id", smokeUserId);
+  // Log COUNT only, never payloads
+  check("15 cleanup", !error,
+    `deleted_user_count=${count ?? 0}${error ? " error=" + error.message : ""}`);
+}
 
-  // Checks 11-15 + R1 added in subsequent tasks.
+async function main() {
+  try {
+    await checkBootAndRtl();
+    await checkAnonCookie();
+    await checkStaticPages();
+    await checkChatReachable();
+    await checkConsent();
+
+    const recs = await checkRecommendationsShape();
+    const KNOWN_OCC_ID = "data-analyst";
+    if (recs?.recommendation_id) {
+      await checkThumbWrites(recs.recommendation_id, KNOWN_OCC_ID);
+    } else {
+      check("07 thumb-write", false, "no recommendation_id from check 6");
+    }
+    await checkNpsIdempotency();
+    await checkNpsDismiss();
+    await checkAdminExportAuth();
+
+    await checkMigrations();
+    await checkStorage();
+    await checkSecurityHeaders();
+    await checkEnvSanity();
+  } finally {
+    await cleanup();
+  }
+
+  // R1 release evidence added in next task.
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} passed; smoke_run_id=${SMOKE_RUN_ID}`);
