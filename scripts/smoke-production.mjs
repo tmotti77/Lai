@@ -378,7 +378,60 @@ async function cleanup() {
     `deleted_user_count=${count ?? 0}${error ? " error=" + error.message : ""}`);
 }
 
+// ── R1 Sentry pipeline (release evidence, non-blocking) ──────────
+// IMPORTANT: must NEVER throw — any network/JSON error must be caught
+// and logged as a check failure (which is itself non-blocking for exit code).
+async function checkSentryPipeline() {
+  try {
+    if (!SENTRY_ORG || !SENTRY_PROJECT || !SENTRY_API_TOKEN) {
+      check("R1 sentry-skipped", true, "sentry args not provided");
+      return;
+    }
+    // Trigger the test event
+    const trig = await fetch(`${URL}/api/_internal/sentry-test`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
+    });
+    if (trig.status !== 200) {
+      check("R1a sentry-trigger", false, `status=${trig.status}`);
+      return;
+    }
+    const triggerBody = await trig.json();
+    const eventId = triggerBody?.eventId;
+    check("R1a sentry-trigger", typeof eventId === "string" && eventId.length >= 16,
+      `eventId=${eventId ? eventId.slice(0, 8) + "..." : "missing"}`);
+    if (!eventId) return;
+
+    // Poll Sentry Events API for up to 5 min
+    const deadline = Date.now() + 5 * 60 * 1000;
+    let found = false;
+    while (Date.now() < deadline) {
+      try {
+        const sentryRes = await fetch(
+          `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/events/?query=event.id:${eventId}`,
+          { headers: { authorization: `Bearer ${SENTRY_API_TOKEN}` } },
+        );
+        if (sentryRes.ok) {
+          const arr = await sentryRes.json();
+          if (Array.isArray(arr) && arr.length > 0) {
+            found = true;
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.warn(`R1 poll attempt failed: ${pollErr.message}`);
+      }
+      await new Promise((r) => setTimeout(r, 15000));
+    }
+    check("R1b sentry-event-visible", found,
+      `event polling completed; visible=${found}`);
+  } catch (err) {
+    check("R1 sentry-error", false, `unexpected: ${err.message}`);
+  }
+}
+
 async function main() {
+  let blockingFailed = 0;
   try {
     await checkBootAndRtl();
     await checkAnonCookie();
@@ -401,14 +454,21 @@ async function main() {
     await checkStorage();
     await checkSecurityHeaders();
     await checkEnvSanity();
+
+    blockingFailed = results.filter((r) => !r.ok).length;
   } finally {
     await cleanup();
   }
 
-  // R1 release evidence added in next task.
+  // R1 is release-evidence, runs but doesn't block exit
+  const beforeR1 = results.length;
+  await checkSentryPipeline();
+  const r1Results = results.slice(beforeR1);
 
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} passed; smoke_run_id=${SMOKE_RUN_ID}`);
+  const failed = results.slice(0, beforeR1).filter((r) => !r.ok);
+  console.log(`\nblocking ${beforeR1 - failed.length}/${beforeR1} passed`);
+  console.log(`release-evidence R1: ${r1Results.filter((r) => r.ok).length}/${r1Results.length} ok`);
+  console.log(`smoke_run_id=${SMOKE_RUN_ID}`);
   if (failed.length > 0) {
     console.error(JSON.stringify(failed, null, 2));
     process.exit(1);
