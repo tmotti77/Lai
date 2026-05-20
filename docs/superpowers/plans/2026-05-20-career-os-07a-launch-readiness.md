@@ -888,9 +888,8 @@ Same command as before. Expected: ~15 checks reported, cleanup runs even if earl
 git add scripts/smoke-production.mjs
 git commit -m "feat(smoke): smoke-production.mjs checks 11-15 + cleanup
 
-Migration check (read-only via SELECT limit(0) on actual tables —
-information_schema isn't queryable via supabase-js; PostgREST exposes
-public schema only). Storage bucket privacy + anon-denied (requires
+Migration check uses a read-only SELECT limit(0) on actual tables
+(feedback + users NPS columns). Storage bucket privacy + anon-denied (requires
 explicit error, not empty list). Security headers (nosniff; CSP
 deferred to 7b). Env sanity (existence-only never-print + supabase
 ref host match). Cleanup via cascade-DELETE from users by smoke
