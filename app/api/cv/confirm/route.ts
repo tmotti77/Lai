@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { getCvUploadForUser, confirmCvUpload } from "@/lib/db/cv";
 import type { ProfileSkill, SkillSource } from "@/lib/cv/types";
+import type { Json } from "@/lib/db/types.gen";
 import taxonomyJson from "@/content/skills/taxonomy.json";
 import { requireConsent, NoConsentError } from "@/lib/consent";
 import { track, skillCountBucket } from "@/lib/analytics";
@@ -68,8 +69,7 @@ export async function mergeCvSkillsIntoLatestProfile(
 
   const { error: updErr } = await svc
     .from("career_profile")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update({ data: mergedData as any })
+    .update({ data: mergedData as unknown as Json })
     .eq("id", profile.id); // ← scoped to THIS row, not all user rows
   if (updErr) throw new Error(`mergeCvSkillsIntoLatestProfile update: ${updErr.message}`);
 }
