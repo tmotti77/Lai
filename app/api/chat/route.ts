@@ -64,6 +64,11 @@ export async function POST(req: Request) {
   const history = await loadMessages(conversation.id);
   const historyAsModelMessages: ModelMessage[] = history
     .filter((m) => m.role === "user" || m.role === "assistant")
+    // Anthropic rejects requests where any message has empty text content
+    // ("messages: text content blocks must be non-empty"). This happens when a
+    // tool-only assistant turn (e.g. Claude calling set_stage with no surrounding
+    // prose) gets persisted as content="". Skip empties on history replay.
+    .filter((m) => typeof m.content === "string" && m.content.trim().length > 0)
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   // Append the current user turn so the LLM sees it. The engine persists via
@@ -102,16 +107,22 @@ export async function POST(req: Request) {
       });
     },
     onAssistantFinish: async (args) => {
-      await appendMessage({
-        conversationId: conversation.id,
-        role: "assistant",
-        content: args.text,
-        inputTokens: args.inputTokens,
-        outputTokens: args.outputTokens,
-        cacheReadTokens: args.cacheReadTokens,
-        cacheWriteTokens: args.cacheWriteTokens,
-        safetyFlag: args.safetyFlag,
-      });
+      // Tool-only turns (e.g. Claude calling set_stage with no prose) leave
+      // args.text empty. Persisting that and replaying it as history poisons
+      // future turns because Anthropic rejects empty text content blocks.
+      // Skip the persist when there's nothing to say.
+      if (args.text && args.text.trim().length > 0) {
+        await appendMessage({
+          conversationId: conversation.id,
+          role: "assistant",
+          content: args.text,
+          inputTokens: args.inputTokens,
+          outputTokens: args.outputTokens,
+          cacheReadTokens: args.cacheReadTokens,
+          cacheWriteTokens: args.cacheWriteTokens,
+          safetyFlag: args.safetyFlag,
+        });
+      }
 
       if (advancedToStage && EXTRACTION_STAGES.has(currentStage)) {
         const stageJustCompleted = currentStage;
