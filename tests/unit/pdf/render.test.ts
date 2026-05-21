@@ -5,12 +5,13 @@ import type { Occupation } from "@/lib/matching/types";
 // PDF rendering goes through @react-pdf/renderer + fontkit + Heebo font load.
 // The whole pipeline runs in-process; no Anthropic or DB calls.
 // This test pins:
-//   1. renderReport returns a Buffer
+//   1. renderReport returns a Buffer when fed a ReportData with Hebrew content
 //   2. The buffer starts with the PDF magic bytes "%PDF-"
 //   3. The buffer ends with "%%EOF" (PDF footer)
-//   4. Hebrew text in the input survives the render (encoded into the PDF stream)
-// If react-pdf or fontkit ever regress on Hebrew or Heebo loading, this test
-// catches it at unit-test speed (no need to spin up a dev server + open a PDF).
+// A render-failure on Hebrew input (font shaping, fontkit, RTL layout) would
+// throw or produce an invalid buffer here. The PDF's text stream is compressed
+// so we do NOT assert the literal Hebrew bytes; the buffer-validity check is
+// the practical proxy for "the pipeline did not crash on Hebrew."
 
 const sampleOccupation: Occupation = {
   id: "product_manager",
