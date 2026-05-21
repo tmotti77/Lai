@@ -83,19 +83,114 @@ const sampleData: ReportData = {
   occupations: [sampleOccupation],
 };
 
+function assertValidPdf(buffer: Buffer, minSize = 4000) {
+  expect(Buffer.isBuffer(buffer)).toBe(true);
+  expect(buffer.length).toBeGreaterThan(minSize);
+  expect(buffer.subarray(0, 8).toString("ascii").startsWith("%PDF-")).toBe(true);
+  expect(buffer.subarray(buffer.length - 32).toString("ascii")).toContain("%%EOF");
+}
+
 describe("renderReport", () => {
   it("renders a valid PDF buffer with Hebrew content", async () => {
-    // Dynamic import to defer the heavy @react-pdf/renderer + fontkit load.
     const { renderReport } = await import("@/lib/pdf/render");
     const buffer = await renderReport(sampleData);
+    assertValidPdf(buffer, 5000);
+  }, 30000);
 
-    expect(Buffer.isBuffer(buffer)).toBe(true);
-    expect(buffer.length).toBeGreaterThan(5000);
+  it("renders with no Big5 (chat-only user without formal assessment)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profile: { ...sampleData.profile, big5: null },
+      rankings: sampleData.rankings.map((r) => ({
+        ...r,
+        breakdown: { ...r.breakdown, big5: null },
+        weights_used: { interests: 30, skills: 22, values: 18, constraints: 18, market: 12 },
+      })),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
 
-    const head = buffer.subarray(0, 8).toString("ascii");
-    expect(head.startsWith("%PDF-")).toBe(true);
+  it("renders with no values + no constraints (very partial profile)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profile: { ...sampleData.profile, values: null, constraints: null },
+      rankings: sampleData.rankings.map((r) => ({
+        ...r,
+        breakdown: { ...r.breakdown, values: null, constraints: null },
+        weights_used: { interests: 36, skills: 28, big5: 22, market: 14 },
+      })),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
 
-    const tail = buffer.subarray(buffer.length - 32).toString("ascii");
-    expect(tail).toContain("%%EOF");
+  it("renders all three paths as null (no qualifying occupations)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      paths: { safe: null, growth: null, wildcard: null },
+      prose: {},
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders mixed Hebrew + English + emoji + numbers", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profileSummaryHe: "בן 22 אחרי צבא 🇮🇱, מחפש כיוון מקצועי. רקע ב-Cyber, ניסיון עם React.",
+      prose: {
+        product_manager:
+          "תפקיד שמשלב Product, חשיבה אסטרטגית ועבודה עם דאטה. צפי שכר: 22,000–50,000 ₪. אנגלית: advanced.",
+      },
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders very long Hebrew prose without crashing", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const long = "תפקיד מאתגר ומעניין. ".repeat(80); // ~1600 chars Hebrew
+    const data: ReportData = {
+      ...sampleData,
+      prose: { product_manager: long },
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders with display_name null (anonymous user)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = { ...sampleData, userDisplayName: null };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders 5 top occupations (the documented top-N)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const occupations: Occupation[] = ["alpha", "beta", "gamma", "delta", "epsilon"].map((slug, idx) => ({
+      ...sampleOccupation,
+      id: slug,
+      title_he: `תפקיד ${idx + 1}`,
+    }));
+    const rankings = occupations.map((o, idx) => ({
+      occupation_id: o.id,
+      total_score: 80 - idx * 5,
+      breakdown: sampleData.rankings[0].breakdown,
+      weights_used: sampleData.rankings[0].weights_used,
+    }));
+    const data: ReportData = {
+      ...sampleData,
+      rankings,
+      occupations,
+      paths: { safe: "alpha", growth: "beta", wildcard: "gamma" },
+      prose: Object.fromEntries(occupations.map((o) => [o.id, "תיאור קצר של התפקיד."])),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
   }, 30000);
 });
