@@ -1,0 +1,35 @@
+{
+  "id": "seo-specialist",
+  "title_he": "מומחה/ית SEO",
+  "title_en": "SEO Specialist",
+  "description_he": "אופטימיזציה של אתרים להופיע גבוה בגוגל — מחקר מילות מפתח, אנליטיקס, שיפור טכני של אתרים, ובניית קישורים. שילוב של ניתוח, יצירתיות בכתיבה, וטיפול בפרטים. נקודת כניסה נוחה לעולם השיווק הדיגיטלי עם אפשרות לעבוד עצמאית.",
+  "riasec_affinity": { "R": 0.10, "I": 0.75, "A": 0.35, "S": 0.20, "E": 0.55, "C": 0.75 },
+  "required_skills": [
+    { "skill_id": "seo", "importance": 1.0 },
+    { "skill_id": "growth-marketing", "importance": 0.8 },
+    { "skill_id": "data-analysis", "importance": 0.75 },
+    { "skill_id": "attention-to-detail", "importance": 0.75 },
+    { "skill_id": "english-business", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "writing-he", "importance": 0.5 },
+    { "skill_id": "copywriting", "importance": 0.45 }
+  ],
+  "values_fit": ["learning", "money", "freedom", "challenge"],
+  "big5_fit": { "C": 70 },
+  "constraints": {
+    "typical_training_months": 4,
+    "typical_training_cost_nis": 7000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["כל הארץ"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 11000,
+    "typical_salary_nis_max": 25000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-21"
+}

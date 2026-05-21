@@ -1,0 +1,35 @@
+{
+  "id": "lawyer",
+  "title_he": "עורך/ת דין",
+  "title_en": "Lawyer / Attorney",
+  "description_he": "ייצוג לקוחות, ניסוח חוזים, ייעוץ משפטי, ולעיתים הופעה בבתי משפט. עולם של חמש שנים תואר ועוד שנת התמחות לפני שמתחילים להרוויח באמת. תפקיד עם הרבה לחץ, סטטוס גבוה, ומסלולים שונים — פלילי, מסחרי, אזרחי, נדל'ן.",
+  "riasec_affinity": { "R": 0.10, "I": 0.75, "A": 0.40, "S": 0.55, "E": 0.85, "C": 0.75 },
+  "required_skills": [
+    { "skill_id": "legal-research", "importance": 1.0 },
+    { "skill_id": "contract-drafting", "importance": 0.85 },
+    { "skill_id": "communication", "importance": 0.9 },
+    { "skill_id": "writing-he", "importance": 0.85 },
+    { "skill_id": "negotiation", "importance": 0.75 }
+  ],
+  "desired_skills": [
+    { "skill_id": "presentation", "importance": 0.6 },
+    { "skill_id": "stress-tolerance", "importance": 0.7 }
+  ],
+  "values_fit": ["status", "money", "challenge", "impact"],
+  "big5_fit": { "C": 80, "E": 60 },
+  "constraints": {
+    "typical_training_months": 72,
+    "typical_training_cost_nis": 120000,
+    "requires_english_level": "advanced",
+    "remote_ok": false,
+    "typical_locations": ["תל אביב", "ירושלים", "חיפה", "מרכז"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 12000,
+    "typical_salary_nis_max": 50000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-21"
+}
