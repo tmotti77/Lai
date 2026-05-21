@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import * as Sentry from "@sentry/nextjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +22,10 @@ export async function POST(req: NextRequest) {
     return new NextResponse("unauthorized", { status: 401 });
   }
 
+  // Lazy import: keeps @sentry/nextjs out of the dev module graph so Turbopack
+  // never tries to bundle @sentry/node-core (which fails on require-in-the-middle).
+  // This route is only ever hit against deployed prod URLs.
+  const Sentry = await import("@sentry/nextjs");
   const eventId = Sentry.captureException(
     new Error("phase-7a smoke: sentry pipeline verification")
   );

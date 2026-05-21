@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   // Next.js's bundler cannot resolve. Marking these as external tells Next
   // to load them via Node's runtime resolution instead of bundling them.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  // Pin Turbopack to this repo so a stray parent-dir package-lock.json doesn't
+  // make it pick a wrong workspace root.
+  turbopack: {
+    root: __dirname,
+  },
 };
 
 export default withSentryConfig(nextConfig, {

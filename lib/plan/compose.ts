@@ -2,7 +2,7 @@ import "server-only";
 import { generateObject, type ModelMessage } from "ai";
 import { z } from "zod";
 import { anthropic, MODEL_ID } from "@/lib/ai/client";
-import type { Archetype, TaskCategory } from "./types";
+import type { Archetype } from "./types";
 import { ARCHETYPE_INTENT_HE } from "./archetypes";
 import type { Ranking, Occupation, MatchingProfile } from "@/lib/matching/types";
 import { TASK_CATEGORIES } from "./types";
