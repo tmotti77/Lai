@@ -22,7 +22,7 @@ const { values: args } = parseArgs({
   },
 });
 
-const URL = args.url;
+const APP_URL = args.url;
 const ADMIN_TOKEN = args["admin-token"];
 const SUPABASE_URL = args["supabase-url"];
 const SUPABASE_ANON_KEY = args["supabase-anon-key"];
@@ -32,7 +32,7 @@ const SENTRY_ORG = args["sentry-org"];
 const SENTRY_PROJECT = args["sentry-project"];
 const SENTRY_API_TOKEN = args["sentry-api-token"];
 
-if (!URL || !ADMIN_TOKEN || !SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SR_KEY || !EXPECTED_REF) {
+if (!APP_URL || !ADMIN_TOKEN || !SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SR_KEY || !EXPECTED_REF) {
   console.error("smoke: missing required args. See spec §6.");
   process.exit(2);
 }
@@ -44,23 +44,28 @@ const results = [];
 let cookieJar = "";
 let smokeUserId = null;
 let coAnonToken = null;
+// Persist the first co_anon-issuing Set-Cookie line so check 02 can inspect
+// its attributes even after the cookie is in the jar (subsequent requests
+// won't re-issue the cookie).
+let firstCoAnonSetCookie = "";
 
 function rememberCookies(res) {
-  const setCookie = res.headers.get("set-cookie");
-  if (!setCookie) return;
-  const pairs = setCookie.split(/,\s*(?=[a-zA-Z0-9_-]+=)/);
-  for (const pair of pairs) {
-    const nameValue = pair.split(";")[0];
-    cookieJar = cookieJar
-      ? `${cookieJar}; ${nameValue}`
-      : nameValue;
+  // Modern undici/Node 20+ exposes getSetCookie() returning an array; older
+  // platforms only have get("set-cookie") which returns the first header.
+  const setCookies = typeof res.headers.getSetCookie === "function"
+    ? res.headers.getSetCookie()
+    : (res.headers.get("set-cookie") ? [res.headers.get("set-cookie")] : []);
+  for (const sc of setCookies) {
+    if (!firstCoAnonSetCookie && /\bco_anon=/.test(sc)) firstCoAnonSetCookie = sc;
+    const nameValue = sc.split(";")[0];
+    cookieJar = cookieJar ? `${cookieJar}; ${nameValue}` : nameValue;
   }
 }
 
 async function fetchWith(path, init = {}) {
   const headers = new Headers(init.headers ?? {});
   if (cookieJar) headers.set("cookie", cookieJar);
-  const res = await fetch(`${URL}${path}`, { ...init, headers, redirect: "manual" });
+  const res = await fetch(`${APP_URL}${path}`, { ...init, headers, redirect: "manual" });
   rememberCookies(res);
   return res;
 }
@@ -81,18 +86,20 @@ async function checkBootAndRtl() {
 
 // ── #2 Anonymous cookie attributes + capture user_id for cleanup ─
 async function checkAnonCookie() {
-  // /chat is the closed-beta entry; first request should set co_anon
-  const res = await fetchWith("/chat");
-  const setCookie = res.headers.get("set-cookie") ?? "";
-  const hasCoAnon = /\bco_anon=/.test(setCookie);
-  const hasSecure = /\bSecure\b/i.test(setCookie);
-  const hasHttpOnly = /\bHttpOnly\b/i.test(setCookie);
-  const hasSameSite = /\bSameSite=Lax\b/i.test(setCookie);
+  // /chat is the closed-beta entry. Cookie was already issued on the earlier
+  // check 01 request to /, so the response here won't re-set co_anon. We
+  // inspect the persisted `firstCoAnonSetCookie` captured by rememberCookies.
+  await fetchWith("/chat");
+  const coAnonCookie = firstCoAnonSetCookie;
+  const hasCoAnon = /\bco_anon=/.test(coAnonCookie);
+  const hasSecure = /\bSecure\b/i.test(coAnonCookie);
+  const hasHttpOnly = /\bHttpOnly\b/i.test(coAnonCookie);
+  const hasSameSite = /\bSameSite=Lax\b/i.test(coAnonCookie);
   check("02 anon-cookie", hasCoAnon && hasSecure && hasHttpOnly && hasSameSite,
     `co_anon=${hasCoAnon} Secure=${hasSecure} HttpOnly=${hasHttpOnly} SameSite=${hasSameSite}`);
 
-  // Extract co_anon value from Set-Cookie header for user_id lookup
-  const match = setCookie.match(/co_anon=([^;]+)/);
+  // Extract co_anon value from the matched cookie line for user_id lookup
+  const match = coAnonCookie.match(/co_anon=([^;]+)/);
   if (match) coAnonToken = match[1];
 
   // Capture the smoke user_id IMMEDIATELY so cleanup works even on early failure.
@@ -269,7 +276,7 @@ async function checkNpsDismiss() {
 // ── #10 Admin export auth matrix (status + content-type ONLY) ────
 async function checkAdminExportAuth() {
   if (!args["skip-admin-success"]) {
-    const ok = await fetch(`${URL}/api/admin/feedback/export`, {
+    const ok = await fetch(`${APP_URL}/api/admin/feedback/export`, {
       headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
     });
     const okStatus = ok.status === 200;
@@ -282,13 +289,13 @@ async function checkAdminExportAuth() {
     check("10a admin-ok-skipped", true, "skipped via --skip-admin-success (preview env)");
   }
 
-  const wrong = await fetch(`${URL}/api/admin/feedback/export`, {
+  const wrong = await fetch(`${APP_URL}/api/admin/feedback/export`, {
     headers: { authorization: "Bearer wrong-token-different-length-than-real-one" },
   });
   if (wrong.body) await wrong.body.cancel();
   check("10b admin-wrong", wrong.status === 401, `status=${wrong.status}`);
 
-  const noAuth = await fetch(`${URL}/api/admin/feedback/export`);
+  const noAuth = await fetch(`${APP_URL}/api/admin/feedback/export`);
   if (noAuth.body) await noAuth.body.cancel();
   check("10c admin-noauth", noAuth.status === 401, `status=${noAuth.status}`);
 }
@@ -324,18 +331,23 @@ async function checkStorage() {
     bucket && bucket.public === false,
     `exists=${!!bucket} public=${bucket?.public}`);
 
-  // Anon-client list MUST return an explicit error (private bucket).
-  // An empty successful list is a false positive — bucket might be public-readable but empty.
+  // Anon must not be able to READ any path inside the bucket. Two acceptable
+  // signals of denial: (a) Storage returns an explicit error, OR (b) Storage
+  // returns an empty array because the only SELECT policy
+  // (cv_storage_select_own) filters to user_id and anon has none. Supabase
+  // returns empty-no-error for the policy-filtered case — that's still secure.
+  // Anything non-empty means a leak.
   const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const { error } = await anon.storage.from("cv-uploads").list();
+  const { data: anonList, error } = await anon.storage.from("cv-uploads").list();
+  const empty = Array.isArray(anonList) && anonList.length === 0;
   check("12b storage-anon-denied",
-    !!error,
-    error ? `denied (expected): ${error.message}` : "FAIL: anon list succeeded — bucket is not private");
+    !!error || empty,
+    error ? `denied (expected): ${error.message}` : empty ? "RLS-filtered to 0 rows (private to owner)" : `FAIL: anon listed ${anonList?.length} entries`);
 }
 
 // ── #13 Security headers (CSP deferred to 7b — not asserted) ─────
 async function checkSecurityHeaders() {
-  const r = await fetch(`${URL}/api/admin/feedback/export`, {
+  const r = await fetch(`${APP_URL}/api/admin/feedback/export`, {
     headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
   });
   if (r.body) await r.body.cancel();
@@ -388,7 +400,7 @@ async function checkSentryPipeline() {
       return;
     }
     // Trigger the test event
-    const trig = await fetch(`${URL}/api/_internal/sentry-test`, {
+    const trig = await fetch(`${APP_URL}/api/_internal/sentry-test`, {
       method: "POST",
       headers: { authorization: `Bearer ${ADMIN_TOKEN}` },
     });
@@ -431,7 +443,6 @@ async function checkSentryPipeline() {
 }
 
 async function main() {
-  let blockingFailed = 0;
   try {
     await checkBootAndRtl();
     await checkAnonCookie();
@@ -454,8 +465,6 @@ async function main() {
     await checkStorage();
     await checkSecurityHeaders();
     await checkEnvSanity();
-
-    blockingFailed = results.filter((r) => !r.ok).length;
   } finally {
     await cleanup();
   }
