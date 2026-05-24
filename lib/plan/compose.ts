@@ -16,7 +16,7 @@ const TaskSchema = z.object({
 });
 
 const ComposeSchema = z.object({
-  tasks: z.array(TaskSchema).length(30),
+  tasks: z.array(TaskSchema).length(15),
 });
 
 export type ComposedTask = z.infer<typeof TaskSchema>;
@@ -24,11 +24,11 @@ export type ComposedTask = z.infer<typeof TaskSchema>;
 const SYSTEM_PROMPT = `אתה כותב תוכנית פעולה של 30 יום בעברית עבור משתמש שקיבל המלצת קריירה. הוא בחר מסלול מסוים, ואתה מקבל את הפרופיל שלו ואת המקצוע הראשי.
 
 החוקים שלך:
-1. בדיוק 30 משימות, יום אחד לכל משימה.
+1. בדיוק 15 משימות. השתמש בימים האלה בלבד, אחד לכל משימה: 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30.
 2. כל משימה היא פעולה ספציפית שאפשר לסיים ביום אחד. לא "תחקור" — אלא "צפה ב-2 ראיונות בפודקאסט X" או "כתוב פסקה על מה שעניין אותך".
 3. כל משימה מקבלת estimated_minutes (10-240).
 4. category: action / research / network / reflection.
-5. בנה התקדמות: השבוע הראשון בעיקר research/reflection, אמצע research/action, סוף בעיקר action/network.
+5. בנה התקדמות: השבועיים הראשונים בעיקר research/reflection, אמצע research/action, סוף בעיקר action/network.
 6. השתמש בנתוני המשתמש (כישורים, ערכים, אילוצים) כדי להפוך את המשימות אישיות. עדיף לצטט מילים שלו אם אפשר.
 7. אל תהיה גנרי. אל תכתוב "צור CV" — כתוב "עדכן את הסקשן 'ניסיון' ב-CV שלך עם תפקיד אחד מהשירות הצבאי בצורה שמתאימה ל[מקצוע]".
 8. אל תכלול עברית רפואית/קלינית. אל תאבחן.`;
