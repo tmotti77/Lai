@@ -13,7 +13,10 @@ import { track } from "@/lib/analytics";
 import { markNpsEligibilityIfFirst } from "@/lib/db/nps";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vercel raised the default function timeout to 300s on all plans in Feb 2026.
+// Plan generation runs one Hebrew Sonnet LLM call that can take 60-90s for the
+// 15-task schema, so 60s was tight. 180s gives generous headroom.
+export const maxDuration = 180;
 
 export async function POST() {
   const supabase = await createClient();
