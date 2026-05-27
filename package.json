@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "db:types": "supabase gen types typescript --linked --schema public > lib/db/types.gen.ts",
     "validate:occupations": "tsx scripts/validate-occupations.ts",
-    "seed:occupations": "tsx scripts/seed-occupations.ts"
+    "seed:occupations": "tsx scripts/seed-occupations.ts",
+    "smoke:submit": "tsx scripts/smoke-assessment-submit.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",
