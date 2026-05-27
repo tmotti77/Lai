@@ -99,4 +99,56 @@ describe("scoreConstraints", () => {
     };
     expect(scoreConstraints(profile, occ({ typical_training_months: 12 }))).toBeLessThan(50);
   });
+
+  // Region-aware location matching: a user who picks a curated city (e.g. רמת גן)
+  // should fit any occupation whose typical_locations includes the city's region.
+  it("treats a curated city as a fit for its parent region", () => {
+    const profile: MatchingProfile = {
+      interests: null, skills: null, big5: null, values: null,
+      constraints: {
+        location_he: "רמת גן", remote_ok: false,
+        time_per_week_hours: 20, training_budget_nis: 50000,
+        english_level: "advanced",
+      },
+    };
+    // Ramat Gan is in מרכז region — occupation lists מרכז → must match.
+    expect(scoreConstraints(profile, occ({ typical_locations: ["מרכז"], remote_ok: false }))).toBe(100);
+  });
+
+  it("treats a Sharon city as a fit for occupations in שרון", () => {
+    const profile: MatchingProfile = {
+      interests: null, skills: null, big5: null, values: null,
+      constraints: {
+        location_he: "הרצליה", remote_ok: false,
+        time_per_week_hours: 20, training_budget_nis: 50000,
+        english_level: "advanced",
+      },
+    };
+    expect(scoreConstraints(profile, occ({ typical_locations: ["שרון"], remote_ok: false }))).toBe(100);
+  });
+
+  it("'כל הארץ' in typical_locations matches any user location", () => {
+    const profile: MatchingProfile = {
+      interests: null, skills: null, big5: null, values: null,
+      constraints: {
+        location_he: "אילת", remote_ok: false,
+        time_per_week_hours: 20, training_budget_nis: 50000,
+        english_level: "advanced",
+      },
+    };
+    // Eilat is in דרום but occupation says "anywhere" — fit.
+    expect(scoreConstraints(profile, occ({ typical_locations: ["כל הארץ"], remote_ok: false }))).toBe(100);
+  });
+
+  it("free-text city not in the curated list still penalizes against unrelated region", () => {
+    const profile: MatchingProfile = {
+      interests: null, skills: null, big5: null, values: null,
+      constraints: {
+        location_he: "כפר בלום-מצפה תנא", remote_ok: false, // intentionally not in CITIES
+        time_per_week_hours: 20, training_budget_nis: 50000,
+        english_level: "advanced",
+      },
+    };
+    expect(scoreConstraints(profile, occ({ typical_locations: ["מרכז"], remote_ok: false }))).toBeLessThan(70);
+  });
 });

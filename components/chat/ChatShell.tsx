@@ -1,26 +1,40 @@
 "use client";
 
+import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { ConsentDialog } from "./ConsentDialog";
 import { he } from "@/lib/i18n/he";
 
-export function ChatShell() {
+export function ChatShell({ initialMessages = [] }: { initialMessages?: UIMessage[] }) {
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
+    messages: initialMessages,
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+  const isResumed = initialMessages.length > 0;
 
   return (
     <div className="mx-auto flex h-dvh max-w-2xl flex-col">
       <ConsentDialog />
       <DisclaimerBanner />
-      <header className="border-b border-border px-4 py-3">
+      <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <h1 className="text-base font-semibold">{he.chat.headerTitle}</h1>
+        <nav className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Link href="/assessment" className="hover:text-foreground transition-colors">
+            {he.chat.nav.assessment}
+          </Link>
+          <Link href="/cv" className="hover:text-foreground transition-colors">
+            {he.chat.nav.cv}
+          </Link>
+          <Link href="/recommendations" className="hover:text-foreground transition-colors">
+            {he.chat.nav.recommendations}
+          </Link>
+        </nav>
       </header>
 
       {messages.length === 0 ? (
@@ -30,6 +44,11 @@ export function ChatShell() {
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
+          {isResumed && (
+            <div className="border-b border-border bg-muted/30 px-4 py-1 text-center text-xs text-muted-foreground">
+              {he.chat.resumed}
+            </div>
+          )}
           <MessageList
             messages={messages}
             isTyping={

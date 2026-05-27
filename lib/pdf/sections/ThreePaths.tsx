@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "@react-pdf/renderer";
 import { styles, colors } from "../styles";
 import { he } from "@/lib/i18n/he";
-import type { Paths, Occupation, Ranking } from "@/lib/matching/types";
+import type { Paths, Occupation } from "@/lib/matching/types";
 
 const labels = he.report.sections.threePaths;
 
@@ -28,12 +28,10 @@ const PATH_COLORS: Record<keyof Paths, string> = {
 
 export function ThreePaths({
   paths,
-  rankings,
   occupations,
   prose,
 }: {
   paths: Paths;
-  rankings: Ranking[];
   occupations: Occupation[];
   prose: Record<string, string>;
 }) {

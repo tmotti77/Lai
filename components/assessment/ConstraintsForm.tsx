@@ -5,7 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { he } from "@/lib/i18n/he";
 import { ConstraintsSchema, ENGLISH_LEVELS } from "@/lib/assessment/constraints/schema";
+import { CITIES } from "@/lib/data/cities";
 import { toast } from "sonner";
+
+const LOCATION_OPTIONS = [
+  // Regions first — many users will pick a region rather than a city.
+  "מרכז",
+  "שרון",
+  "צפון",
+  "דרום",
+  "ירושלים",
+  "כל הארץ",
+  // Cities in declaration order so the dropdown surfaces major hubs early.
+  ...CITIES.map((c) => c.name_he),
+];
 
 const initialState = {
   location_he: "",
@@ -77,10 +90,18 @@ export function ConstraintsForm() {
       <Field label={labels.location_he}>
         <Input
           required
+          list="constraints-cities"
+          autoComplete="off"
           value={form.location_he}
           onChange={(e) => setField("location_he", e.target.value)}
-          placeholder="מרכז / צפון / דרום / שרון / ירושלים …"
+          placeholder="מרכז / שרון / תל אביב / רמת גן / ירושלים …"
         />
+        <datalist id="constraints-cities">
+          {/* Deduplicate while preserving declaration order — regions listed first */}
+          {Array.from(new Set(LOCATION_OPTIONS)).map((opt) => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
       </Field>
 
       <CheckboxField

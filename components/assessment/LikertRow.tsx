@@ -2,12 +2,10 @@
 import { he } from "@/lib/i18n/he";
 
 export function LikertRow({
-  itemId,
   text,
   value,
   onChange,
 }: {
-  itemId: string;
   text: string;
   value: number | undefined;
   onChange: (next: number) => void;

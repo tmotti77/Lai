@@ -1,0 +1,34 @@
+{
+  "id": "content-writer",
+  "title_he": "כותב/ת תוכן",
+  "title_en": "Content Writer",
+  "description_he": "יצירת תוכן לבלוגים, אתרים, ניוזלטרים, ורשתות חברתיות — בעברית או באנגלית. עבודה שמשלבת מחקר, יצירתיות, והבנת קהל יעד. נקודת כניסה נוחה לעולם השיווק הדיגיטלי, אפשרות לעבוד עצמאית או כשכיר/ה, וגמישות גיאוגרפית גבוהה.",
+  "riasec_affinity": { "R": 0.10, "I": 0.55, "A": 0.85, "S": 0.40, "E": 0.40, "C": 0.40 },
+  "required_skills": [
+    { "skill_id": "writing-he", "importance": 1.0 },
+    { "skill_id": "creativity", "importance": 0.85 },
+    { "skill_id": "research-skills", "importance": 0.7 },
+    { "skill_id": "self-direction", "importance": 0.7 }
+  ],
+  "desired_skills": [
+    { "skill_id": "seo", "importance": 0.55 },
+    { "skill_id": "writing-en", "importance": 0.5 }
+  ],
+  "values_fit": ["creativity", "freedom", "balance", "variety"],
+  "big5_fit": { "O": 75 },
+  "constraints": {
+    "typical_training_months": 2,
+    "typical_training_cost_nis": 3000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["כל הארץ"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 8000,
+    "typical_salary_nis_max": 22000,
+    "ai_risk": "high"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-21"
+}

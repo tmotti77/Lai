@@ -22,6 +22,11 @@ export const he = {
     sending: "שולח…",
     newChat: "שיחה חדשה",
     headerTitle: "שיחה עם CareerOS",
+    nav: {
+      assessment: "שאלונים",
+      cv: "קורות חיים",
+      recommendations: "המלצות",
+    },
     emptyState: {
       title: "בוא נתחיל להכיר",
       body: "ספר לי במשפט אחד איפה אתה נמצא היום מבחינת לימודים, עבודה או התלבטות.",
@@ -31,6 +36,7 @@ export const he = {
       rateLimit: "יותר מדי בקשות בזמן קצר. ננסה שוב בעוד דקה?",
     },
     thinking: "CareerOS חושב…",
+    resumed: "ממשיכים מאיפה שעצרת",
   },
   auth: {
     signInTitle: "התחברות / הרשמה",

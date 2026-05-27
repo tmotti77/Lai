@@ -1,0 +1,34 @@
+{
+  "id": "copywriter",
+  "title_he": "קופירייטר/ית",
+  "title_en": "Copywriter",
+  "description_he": "כתיבת טקסטים שיווקיים שמניעים לפעולה — מודעות, דפי נחיתה, אימיילים, סלוגנים. עבודה במשרדי פרסום, חברות הייטק, או כפרילנס. דורש הבנה עמוקה של פסיכולוגיית הקונה, ויכולת לתפוס במשפט אחד מה שאחרים כותבים בפסקה.",
+  "riasec_affinity": { "R": 0.10, "I": 0.45, "A": 0.95, "S": 0.40, "E": 0.65, "C": 0.35 },
+  "required_skills": [
+    { "skill_id": "copywriting", "importance": 1.0 },
+    { "skill_id": "writing-he", "importance": 0.95 },
+    { "skill_id": "creativity", "importance": 0.95 },
+    { "skill_id": "marketing", "importance": 0.55 }
+  ],
+  "desired_skills": [
+    { "skill_id": "writing-en", "importance": 0.55 },
+    { "skill_id": "presentation", "importance": 0.4 }
+  ],
+  "values_fit": ["creativity", "freedom", "challenge", "variety"],
+  "big5_fit": { "O": 80, "E": 60 },
+  "constraints": {
+    "typical_training_months": 3,
+    "typical_training_cost_nis": 6000,
+    "requires_english_level": "intermediate",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "כל הארץ"]
+  },
+  "market": {
+    "demand_he": "medium",
+    "typical_salary_nis_min": 11000,
+    "typical_salary_nis_max": 25000,
+    "ai_risk": "high"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-21"
+}

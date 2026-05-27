@@ -21,7 +21,6 @@ export function ReportDocument({ data }: { data: ReportData }) {
         <View style={styles.divider} />
         <ThreePaths
           paths={data.paths}
-          rankings={data.rankings}
           occupations={data.occupations}
           prose={data.prose}
         />

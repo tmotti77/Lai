@@ -1,4 +1,5 @@
 import type { MatchingProfile, Occupation } from "../types";
+import { regionForCity } from "@/lib/data/cities";
 
 const ENGLISH_LEVELS = ["none", "basic", "intermediate", "advanced", "fluent"] as const;
 
@@ -14,7 +15,15 @@ export function scoreConstraints(profile: MatchingProfile, occupation: Occupatio
   let penalty = 0;
 
   if (c.location_he && oc.typical_locations.length > 0) {
-    const locationFits = oc.typical_locations.includes(c.location_he);
+    // Direct city/region match OR the user's city maps into one of the
+    // occupation's listed regions (e.g. user picks "רמת גן", occupation
+    // lists "מרכז" — same fit). Free-text city names not in the curated
+    // list return region=null and only the direct exact-string match runs.
+    const directFit = oc.typical_locations.includes(c.location_he);
+    const userRegion = regionForCity(c.location_he);
+    const regionFit = userRegion !== null && oc.typical_locations.includes(userRegion);
+    const anywhereFit = oc.typical_locations.includes("כל הארץ");
+    const locationFits = directFit || regionFit || anywhereFit;
     const bothRemote = c.remote_ok === true && oc.remote_ok === true;
     if (!locationFits && !bothRemote) penalty += 35;
   }

@@ -1,0 +1,196 @@
+import { describe, it, expect } from "vitest";
+import type { ReportData } from "@/lib/pdf/types";
+import type { Occupation } from "@/lib/matching/types";
+
+// PDF rendering goes through @react-pdf/renderer + fontkit + Heebo font load.
+// The whole pipeline runs in-process; no Anthropic or DB calls.
+// This test pins:
+//   1. renderReport returns a Buffer when fed a ReportData with Hebrew content
+//   2. The buffer starts with the PDF magic bytes "%PDF-"
+//   3. The buffer ends with "%%EOF" (PDF footer)
+// A render-failure on Hebrew input (font shaping, fontkit, RTL layout) would
+// throw or produce an invalid buffer here. The PDF's text stream is compressed
+// so we do NOT assert the literal Hebrew bytes; the buffer-validity check is
+// the practical proxy for "the pipeline did not crash on Hebrew."
+
+const sampleOccupation: Occupation = {
+  id: "product_manager",
+  title_he: "מנהל/ת מוצר",
+  title_en: "Product Manager",
+  description_he: "אחראי/ת על הגדרת המוצר ותעדוף משימות פיתוח.",
+  riasec_affinity: { R: 0.2, I: 0.6, A: 0.4, S: 0.5, E: 0.8, C: 0.5 },
+  required_skills: [{ skill_id: "communication", importance: 0.9 }],
+  desired_skills: [{ skill_id: "sql", importance: 0.4 }],
+  values_fit: ["impact", "growth"],
+  constraints: {
+    typical_training_months: 6,
+    typical_training_cost_nis: 8000,
+    requires_english_level: "advanced",
+    remote_ok: true,
+    typical_locations: ["מרכז"],
+  },
+  market: {
+    demand_he: "high",
+    typical_salary_nis_min: 18000,
+    typical_salary_nis_max: 35000,
+    ai_risk: "low",
+  },
+  data_source: "test_fixture",
+  last_verified_at: "2026-05-21",
+};
+
+const sampleData: ReportData = {
+  generatedAt: "2026-05-21T10:00:00.000Z",
+  userDisplayName: "אורח/ת",
+  profile: {
+    interests: { R: 30, I: 70, A: 40, S: 50, E: 80, C: 60 },
+    skills: [{ id: "communication", level: 0.8 }],
+    values: { topThree: ["impact", "growth", "autonomy"], alsoPicked: ["balance", "creativity"] },
+    big5: { O: 70, C: 60, E: 55, A: 65, N: 40 },
+    constraints: {
+      location_he: "מרכז",
+      remote_ok: true,
+      time_per_week_hours: 20,
+      english_level: "advanced",
+      risk_tolerance: 6,
+      needs_immediate_income: false,
+    },
+  },
+  profileSummaryHe: "בן 22 אחרי צבא, מחפש כיוון מקצועי.",
+  rankings: [
+    {
+      occupation_id: "product_manager",
+      total_score: 78,
+      breakdown: {
+        interests: 80,
+        skills: 70,
+        values: 75,
+        big5: 72,
+        constraints: 85,
+        market: 90,
+      },
+      weights_used: { interests: 25, skills: 20, values: 15, big5: 15, constraints: 15, market: 10 },
+    },
+  ],
+  paths: {
+    safe: "product_manager",
+    growth: null,
+    wildcard: null,
+  },
+  prose: {
+    product_manager: "תפקיד שמשלב יצירתיות, אחריות, ועבודה עם אנשים — מתאים לפרופיל שלך.",
+  },
+  occupations: [sampleOccupation],
+};
+
+function assertValidPdf(buffer: Buffer, minSize = 4000) {
+  expect(Buffer.isBuffer(buffer)).toBe(true);
+  expect(buffer.length).toBeGreaterThan(minSize);
+  expect(buffer.subarray(0, 8).toString("ascii").startsWith("%PDF-")).toBe(true);
+  expect(buffer.subarray(buffer.length - 32).toString("ascii")).toContain("%%EOF");
+}
+
+describe("renderReport", () => {
+  it("renders a valid PDF buffer with Hebrew content", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const buffer = await renderReport(sampleData);
+    assertValidPdf(buffer, 5000);
+  }, 30000);
+
+  it("renders with no Big5 (chat-only user without formal assessment)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profile: { ...sampleData.profile, big5: null },
+      rankings: sampleData.rankings.map((r) => ({
+        ...r,
+        breakdown: { ...r.breakdown, big5: null },
+        weights_used: { interests: 30, skills: 22, values: 18, constraints: 18, market: 12 },
+      })),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders with no values + no constraints (very partial profile)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profile: { ...sampleData.profile, values: null, constraints: null },
+      rankings: sampleData.rankings.map((r) => ({
+        ...r,
+        breakdown: { ...r.breakdown, values: null, constraints: null },
+        weights_used: { interests: 36, skills: 28, big5: 22, market: 14 },
+      })),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders all three paths as null (no qualifying occupations)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      paths: { safe: null, growth: null, wildcard: null },
+      prose: {},
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders mixed Hebrew + English + emoji + numbers", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = {
+      ...sampleData,
+      profileSummaryHe: "בן 22 אחרי צבא 🇮🇱, מחפש כיוון מקצועי. רקע ב-Cyber, ניסיון עם React.",
+      prose: {
+        product_manager:
+          "תפקיד שמשלב Product, חשיבה אסטרטגית ועבודה עם דאטה. צפי שכר: 22,000–50,000 ₪. אנגלית: advanced.",
+      },
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders very long Hebrew prose without crashing", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const long = "תפקיד מאתגר ומעניין. ".repeat(80); // ~1600 chars Hebrew
+    const data: ReportData = {
+      ...sampleData,
+      prose: { product_manager: long },
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders with display_name null (anonymous user)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const data: ReportData = { ...sampleData, userDisplayName: null };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+
+  it("renders 5 top occupations (the documented top-N)", async () => {
+    const { renderReport } = await import("@/lib/pdf/render");
+    const occupations: Occupation[] = ["alpha", "beta", "gamma", "delta", "epsilon"].map((slug, idx) => ({
+      ...sampleOccupation,
+      id: slug,
+      title_he: `תפקיד ${idx + 1}`,
+    }));
+    const rankings = occupations.map((o, idx) => ({
+      occupation_id: o.id,
+      total_score: 80 - idx * 5,
+      breakdown: sampleData.rankings[0].breakdown,
+      weights_used: sampleData.rankings[0].weights_used,
+    }));
+    const data: ReportData = {
+      ...sampleData,
+      rankings,
+      occupations,
+      paths: { safe: "alpha", growth: "beta", wildcard: "gamma" },
+      prose: Object.fromEntries(occupations.map((o) => [o.id, "תיאור קצר של התפקיד."])),
+    };
+    const buffer = await renderReport(data);
+    assertValidPdf(buffer);
+  }, 30000);
+});

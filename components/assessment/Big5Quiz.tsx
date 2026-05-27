@@ -50,7 +50,6 @@ export function Big5Quiz() {
       {BIG5_ITEMS.map((item) => (
         <LikertRow
           key={item.id}
-          itemId={item.id}
           text={item.text_he}
           value={responses[item.id]}
           onChange={(n) => setResponses((prev) => ({ ...prev, [item.id]: n }))}

@@ -11,6 +11,7 @@ export function PlanClient() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [noRecommendation, setNoRecommendation] = useState(false);
 
   const generate = async (confirm = true) => {
     if (plan && confirm && !window.confirm(he.plan.regenerateConfirm)) return;
@@ -19,12 +20,18 @@ export function PlanClient() {
       const res = await fetch("/api/plan/generate", { method: "POST" });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        toast.error(json.error === "no_recommendation" ? he.plan.error.noRecommendation : he.plan.error.generic);
+        if (json.error === "no_recommendation") {
+          setNoRecommendation(true);
+          toast.error(he.plan.error.noRecommendation);
+        } else {
+          toast.error(he.plan.error.generic);
+        }
         setGenerating(false);
         return;
       }
       const json = await res.json();
       setPlan(json);
+      setNoRecommendation(false);
     } catch {
       toast.error(he.plan.error.generic);
     }
@@ -75,6 +82,10 @@ export function PlanClient() {
         </span>
       </div>
     );
+  }
+
+  if (!plan && noRecommendation) {
+    return <PlanEmptyState />;
   }
 
   if (!plan) {

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "skills": [
     { "id": "programming-general", "name_he": "תכנות כללי", "category": "technical", "related_ids": ["javascript", "python"] },
     { "id": "javascript", "name_he": "JavaScript / TypeScript", "category": "technical", "related_ids": ["programming-general", "react"] },
@@ -65,6 +65,29 @@
     { "id": "arabic", "name_he": "ערבית", "category": "language", "related_ids": [] },
     { "id": "time-management", "name_he": "ניהול זמן", "category": "soft", "related_ids": ["self-direction"] },
     { "id": "problem-solving", "name_he": "פתרון בעיות", "category": "analytical", "related_ids": ["research-skills"] },
-    { "id": "curriculum-design", "name_he": "תכנון תוכניות לימוד", "category": "creative", "related_ids": ["teaching", "child-development"] }
+    { "id": "curriculum-design", "name_he": "תכנון תוכניות לימוד", "category": "creative", "related_ids": ["teaching", "child-development"] },
+    { "id": "machine-learning", "name_he": "Machine Learning / מודלים", "category": "technical", "related_ids": ["python", "statistics", "data-analysis"] },
+    { "id": "cybersecurity", "name_he": "אבטחת מידע / סייבר", "category": "technical", "related_ids": ["linux-cli", "cloud"] },
+    { "id": "mobile-development", "name_he": "פיתוח Mobile (iOS/Android)", "category": "technical", "related_ids": ["programming-general"] },
+    { "id": "nutrition-science", "name_he": "מדעי התזונה", "category": "analytical", "related_ids": ["anatomy"] },
+    { "id": "speech-therapy", "name_he": "קלינאות תקשורת", "category": "social", "related_ids": ["empathy", "child-development"] },
+    { "id": "ot-practice", "name_he": "ריפוי בעיסוק", "category": "social", "related_ids": ["empathy", "anatomy"] },
+    { "id": "legal-research", "name_he": "מחקר משפטי", "category": "analytical", "related_ids": ["research-skills", "writing-he"] },
+    { "id": "contract-drafting", "name_he": "ניסוח חוזים והסכמים", "category": "analytical", "related_ids": ["legal-research", "attention-to-detail"] },
+    { "id": "plumbing", "name_he": "אינסטלציה / צנרת", "category": "technical", "related_ids": ["tool-use", "manual-dexterity"] },
+    { "id": "auto-mechanics", "name_he": "מכונאות רכב", "category": "technical", "related_ids": ["tool-use", "problem-solving"] },
+    { "id": "real-estate-practice", "name_he": "תיווך נדל'ן", "category": "social", "related_ids": ["sales", "negotiation"] },
+    { "id": "emergency-medicine", "name_he": "רפואת חירום", "category": "technical", "related_ids": ["first-aid", "anatomy", "stress-tolerance"] },
+    { "id": "recruiting", "name_he": "גיוס וסינון מועמדים", "category": "social", "related_ids": ["communication", "empathy"] },
+    { "id": "video-editing", "name_he": "עריכת וידאו", "category": "creative", "related_ids": ["creativity"] },
+    { "id": "photography", "name_he": "צילום", "category": "creative", "related_ids": ["creativity"] },
+    { "id": "journalism", "name_he": "עיתונאות / כתיבת חדשות", "category": "creative", "related_ids": ["writing-he", "research-skills"] },
+    { "id": "seo", "name_he": "SEO ואופטימיזציה למנועי חיפוש", "category": "technical", "related_ids": ["growth-marketing", "data-analysis"] },
+    { "id": "social-media-strategy", "name_he": "אסטרטגיית סושיאל מדיה", "category": "creative", "related_ids": ["marketing", "copywriting"] },
+    { "id": "agile-scrum", "name_he": "Scrum / Agile", "category": "managerial", "related_ids": ["project-management", "team-leadership"] },
+    { "id": "financial-modeling", "name_he": "מודלים פיננסיים", "category": "analytical", "related_ids": ["spreadsheets", "data-analysis"] },
+    { "id": "requirements-analysis", "name_he": "ניתוח דרישות עסקיות", "category": "analytical", "related_ids": ["research-skills", "process-design"] },
+    { "id": "product-design", "name_he": "עיצוב מוצר רחב היקף", "category": "creative", "related_ids": ["ux-design", "ui-design"] },
+    { "id": "podcast-audio", "name_he": "הפקת אודיו / פודקאסט", "category": "creative", "related_ids": ["creativity"] }
   ]
 }

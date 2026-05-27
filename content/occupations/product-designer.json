@@ -1,0 +1,35 @@
+{
+  "id": "product-designer",
+  "title_he": "מעצב/ת מוצר",
+  "title_en": "Product Designer",
+  "description_he": "כמו UX designer אבל רחב יותר — אחריות גם על המחקר, גם על ה-UI, גם על המערכת העיצובית, ולעיתים גם על אסטרטגיית המוצר. תפקיד שמשלב חשיבה אסטרטגית, אמפתיה ויכולת ביצוע גם יחד. ביקוש גבוה במיוחד בחברות הייטק בוגרות.",
+  "riasec_affinity": { "R": 0.10, "I": 0.55, "A": 0.95, "S": 0.50, "E": 0.45, "C": 0.55 },
+  "required_skills": [
+    { "skill_id": "product-design", "importance": 1.0 },
+    { "skill_id": "ux-design", "importance": 0.9 },
+    { "skill_id": "ui-design", "importance": 0.85 },
+    { "skill_id": "creativity", "importance": 0.85 },
+    { "skill_id": "english-business", "importance": 0.8 }
+  ],
+  "desired_skills": [
+    { "skill_id": "research-skills", "importance": 0.65 },
+    { "skill_id": "product-management", "importance": 0.4 }
+  ],
+  "values_fit": ["creativity", "impact", "learning", "money", "challenge"],
+  "big5_fit": { "O": 80, "E": 55 },
+  "constraints": {
+    "typical_training_months": 12,
+    "typical_training_cost_nis": 30000,
+    "requires_english_level": "advanced",
+    "remote_ok": true,
+    "typical_locations": ["מרכז", "תל אביב", "שרון"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 18000,
+    "typical_salary_nis_max": 42000,
+    "ai_risk": "medium"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-05-21"
+}
