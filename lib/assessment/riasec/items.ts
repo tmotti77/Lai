@@ -1,6 +1,6 @@
 import type { RiasecItem } from "./types";
 
-export const RIASEC_ITEMS_VERSION = 1;
+export const RIASEC_ITEMS_VERSION = 2;
 
 export const RIASEC_ITEMS: RiasecItem[] = [
   // Realistic — בונה, מתקן, פיזי, מעשי
@@ -8,7 +8,7 @@ export const RIASEC_ITEMS: RiasecItem[] = [
   { id: "R2", type: "R", text_he: "מעניין אותי להפעיל מכונות, ציוד או כלים מקצועיים." },
   { id: "R3", type: "R", text_he: "הייתי שמח לעבוד באוויר הפתוח, גם אם זה דורש מאמץ פיזי." },
   { id: "R4", type: "R", text_he: "אני מעדיף לראות תוצאה מוחשית של מה שעשיתי בסוף היום." },
-  { id: "R5", type: "R", text_he: "מעניין אותי איך דברים מורכבים — מנועים, מבנים, מערכות." },
+  { id: "R5", type: "R", text_he: "מעניין אותי איך דברים מורכבים עובדים — מנועים, מבנים, מערכות." },
 
   // Investigative — חוקר, מנתח, מדעי
   { id: "I1", type: "I", text_he: "אני אוהב להבין למה דברים עובדים כמו שהם עובדים." },
@@ -19,7 +19,7 @@ export const RIASEC_ITEMS: RiasecItem[] = [
 
   // Artistic — יצירתי, מבטא, אומנותי
   { id: "A1", type: "A", text_he: "אני נהנה ליצור — לכתוב, לצייר, לצלם, להלחין או לעצב." },
-  { id: "A2", type: "A", text_he: "חשוב לי לעבוד בסביבה שמאפשרת לי גמישות וביטוי אישי." },
+  { id: "A2", type: "A", text_he: "חשוב לי לעבוד בסביבה שמאפשרת לי להביע את עצמי באופן אישי." },
   { id: "A3", type: "A", text_he: "מעניין אותי איך לעצב חוויה — מוצר, מרחב, סיפור." },
   { id: "A4", type: "A", text_he: "אני מעדיף עבודה פתוחה בלי הרבה כללים נוקשים." },
   { id: "A5", type: "A", text_he: "אומנות, מוזיקה או עיצוב הם חלק חשוב בחיים שלי." },
