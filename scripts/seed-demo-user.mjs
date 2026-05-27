@@ -106,7 +106,7 @@ const riasecCode = (["R","I","A","S","E","C"])
 const riasecScores = { ...riasecBare, hollandCode: riasecCode };
 await svc.from("assessments").insert({
   user_id: userId, type: "riasec",
-  responses: riasecResp, scores: riasecScores, items_version: 1,
+  responses: riasecResp, scores: riasecScores, items_version: 2,
 });
 
 // ─────────────────────────────────────────────────────────────────
