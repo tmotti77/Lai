@@ -26,7 +26,8 @@ export function ChatShell({ initialMessages = [], initialStage = "onboarding" }:
 
   const isLoading = status === "submitted" || status === "streaming";
   const isResumed = initialMessages.length > 0;
-  const showRecommendationsCta = currentStage === "complete";
+  // Show CTA on both "wrap" and "complete" — live wrap often stays on wrap without transitioning
+  const showRecommendationsCta = currentStage === "complete" || currentStage === "wrap";
 
   // Fetch stage after each turn completes (when loading stops)
   const prevLoadingRef = useRef(false);
