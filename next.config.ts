@@ -5,7 +5,9 @@ const nextConfig: NextConfig = {
   // pdf-parse v2 internally imports pdfjs-dist with a worker model that
   // Next.js's bundler cannot resolve. Marking these as external tells Next
   // to load them via Node's runtime resolution instead of bundling them.
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  // @napi-rs/canvas provides DOMMatrix and other canvas APIs needed by pdfjs-dist
+  // in Node.js serverless environments (Vercel Functions).
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
   // Pin Turbopack to this repo so a stray parent-dir package-lock.json doesn't
   // make it pick a wrong workspace root.
   turbopack: {
