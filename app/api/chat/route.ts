@@ -12,6 +12,7 @@ import { updateConversationStage } from "@/lib/db/profile";
 import { runExtraction } from "@/lib/ai/extraction";
 import { requireConsent, NoConsentError } from "@/lib/consent";
 import { track } from "@/lib/analytics";
+import { ensureRecommendationsLink } from "@/lib/ai/ensure-wrap-link";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -112,10 +113,18 @@ export async function POST(req: Request) {
       // future turns because Anthropic rejects empty text content blocks.
       // Skip the persist when there's nothing to say.
       if (args.text && args.text.trim().length > 0) {
+        // When advancing to complete, ensure the message has a clickable link
+        // to /recommendations. The model sometimes emits bare paths (e.g., "פנה ל- /recommendations")
+        // which MessageBubble can't detect as links. This guarantees a proper markdown link exists.
+        let finalText = args.text;
+        if (advancedToStage === "complete") {
+          finalText = ensureRecommendationsLink(args.text);
+        }
+
         await appendMessage({
           conversationId: conversation.id,
           role: "assistant",
-          content: args.text,
+          content: finalText,
           inputTokens: args.inputTokens,
           outputTokens: args.outputTokens,
           cacheReadTokens: args.cacheReadTokens,
