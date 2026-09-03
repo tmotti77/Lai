@@ -352,4 +352,138 @@ describe("pickPaths", () => {
     // Wildcard: null (all candidates already used)
     expect(paths.wildcard).toBeNull();
   });
+
+  it("production case: hvac safe, plumber/electrician fill growth+wildcard (all non-null)", () => {
+    // Real production ranking from 2026-09-03: plumber(91), hvac(85), electrician(82), security-systems(82), auto-mechanic(79)
+    // Safe should pick hvac, growth should pick plumber or electrician, wildcard the other — all three non-null
+    const autoMechanic: Occupation = {
+      id: "auto-mechanic",
+      title_he: "מכונאי רכב",
+      title_en: "Auto Mechanic",
+      description_he: "מתקן רכבים",
+      riasec_affinity: { R: 0.9, I: 0.4, A: 0.1, S: 0.3, E: 0.2, C: 0.3 },
+      required_skills: [],
+      desired_skills: [],
+      values_fit: ["autonomy"],
+      constraints: {
+        typical_training_months: 18,
+        typical_training_cost_nis: 30000,
+        requires_english_level: "basic",
+        remote_ok: false,
+        typical_locations: ["center"],
+      },
+      market: {
+        demand_he: "high",
+        typical_salary_nis_min: 8000,
+        typical_salary_nis_max: 16000,
+        ai_risk: "low",
+      },
+      data_source: "test",
+      last_verified_at: "2026-09-01",
+    };
+    const securitySystems: Occupation = {
+      id: "security-systems",
+      title_he: "טכנאי מערכות אבטחה",
+      title_en: "Security Systems Tech",
+      description_he: "מתקין מערכות אבטחה",
+      riasec_affinity: { R: 0.8, I: 0.5, A: 0.1, S: 0.3, E: 0.2, C: 0.4 },
+      required_skills: [],
+      desired_skills: [],
+      values_fit: ["stability"],
+      constraints: {
+        typical_training_months: 9,
+        typical_training_cost_nis: 20000,
+        requires_english_level: "basic",
+        remote_ok: false,
+        typical_locations: ["center"],
+      },
+      market: {
+        demand_he: "high",
+        typical_salary_nis_min: 9000,
+        typical_salary_nis_max: 17000,
+        ai_risk: "low",
+      },
+      data_source: "test",
+      last_verified_at: "2026-09-01",
+    };
+
+    const rankings: Ranking[] = [
+      {
+        occupation_id: "plumber",
+        total_score: 91,
+        breakdown: {
+          interests: null,
+          skills: 87,
+          values: null,
+          big5: null,
+          constraints: 92,
+          market: 88,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "hvac-tech",
+        total_score: 85,
+        breakdown: {
+          interests: null,
+          skills: 82,
+          values: null,
+          big5: null,
+          constraints: 90,
+          market: 83,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "electrician",
+        total_score: 82,
+        breakdown: {
+          interests: null,
+          skills: 80,
+          values: null,
+          big5: null,
+          constraints: 85,
+          market: 80,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "security-systems",
+        total_score: 82,
+        breakdown: {
+          interests: null,
+          skills: 79,
+          values: null,
+          big5: null,
+          constraints: 86,
+          market: 81,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "auto-mechanic",
+        total_score: 79,
+        breakdown: {
+          interests: null,
+          skills: 76,
+          values: null,
+          big5: null,
+          constraints: 83,
+          market: 78,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+    ];
+
+    const paths = pickPaths(rankings, [...mockOccupations, autoMechanic, securitySystems]);
+
+    // Safe: hvac-tech (constraints 90≥70, training 6mo≤12, high demand, total 85≥70)
+    expect(paths.safe).toBe("hvac-tech");
+    
+    // Growth: plumber (highest unused total_score 91≥60, training 9mo in 3-36, medium demand meets criteria)
+    expect(paths.growth).toBe("plumber");
+    
+    // Wildcard: electrician (next highest unused total_score 82≥60)
+    expect(paths.wildcard).toBe("electrician");
+  });
 });
