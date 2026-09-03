@@ -28,6 +28,16 @@ export const EXTRACTION_SYSTEM_PROMPT = `אתה כלי חילוץ מובנה ש�
 קרא לכלי extract_profile עם הנתונים שמצאת. אל תכתוב טקסט גלוי בנוסף לקריאה לכלי.`;
 
 export function buildExtractionUserPrompt(stage: Stage, conversationText: string): string {
+  // wrap is the final comprehensive pass — extract all dimensions
+  if (stage === "wrap") {
+    return `שלב לחילוץ: ${stage}
+
+תוכן השיחה:
+${conversationText}
+
+זהו שלב הסיכום הסופי. חלץ את כל המידע הרלוונטי שהמשתמש שיתף — תחומי עניין, כישורים, ערכים, ואילוצים. אין צורך להגביל את החילוץ לממד בודד. זו הזדמנות אחרונה לתפוס כל דבר שהוחמץ בשלבים קודמים.`;
+  }
+
   return `שלב לחילוץ: ${stage}
 
 תוכן השיחה:
