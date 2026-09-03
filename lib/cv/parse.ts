@@ -13,26 +13,19 @@ export async function extractText(
   let raw: string;
 
   if (mimeType === "application/pdf") {
-    // CRITICAL: pdf-parse's pdfjs-dist requires canvas APIs in Node.
-    // useWorkerFetch: false avoids DOM-based worker but pdfjs still references DOMMatrix, Path2D, etc.
-    // @napi-rs/canvas provides native implementations; we must polyfill globalThis BEFORE importing pdf-parse.
-    const canvas = await import("@napi-rs/canvas");
-    (globalThis as any).DOMMatrix = canvas.DOMMatrix;
-    (globalThis as any).Path2D = canvas.Path2D;
-    (globalThis as any).ImageData = canvas.ImageData;
-    (globalThis as any).CanvasRenderingContext2D = canvas.CanvasRenderingContext2D;
-
-    // pdf-parse v2 uses a class-based API.
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({
-      data: buffer,
-      useWorkerFetch: false,
-    });
+    // unpdf is designed for serverless environments and requires NO canvas polyfills.
+    // It uses pdfjs-dist's text-extraction path only, avoiding all DOM/canvas APIs.
+    const { extractText: unpdfExtract, getDocumentProxy } = await import("unpdf");
     try {
-      const result = await parser.getText();
-      raw = result.text;
-    } finally {
-      await parser.destroy();
+      // unpdf requires Uint8Array; Node Buffer is a subclass but unpdf rejects it
+      const uint8 = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      const pdf = await getDocumentProxy(uint8);
+      const { text } = await unpdfExtract(pdf, { mergePages: true });
+      raw = text;
+    } catch (err) {
+      // unpdf may throw on malformed PDFs; wrap with context
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`unpdf_failed: ${message}`);
     }
   } else if (
     mimeType ===

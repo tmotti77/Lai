@@ -2,12 +2,10 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // pdf-parse v2 internally imports pdfjs-dist with a worker model that
-  // Next.js's bundler cannot resolve. Marking these as external tells Next
-  // to load them via Node's runtime resolution instead of bundling them.
-  // @napi-rs/canvas provides DOMMatrix and other canvas APIs needed by pdfjs-dist
-  // in Node.js serverless environments (Vercel Functions).
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "@napi-rs/canvas"],
+  // unpdf is serverless-native and requires no canvas polyfills. It uses
+  // pdfjs-dist's text-only extraction path (no rendering). Mark it external
+  // so Next.js loads it via Node resolution rather than bundling.
+  serverExternalPackages: ["unpdf"],
   // Pin Turbopack to this repo so a stray parent-dir package-lock.json doesn't
   // make it pick a wrong workspace root.
   turbopack: {

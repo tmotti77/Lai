@@ -40,11 +40,12 @@ describe.skipIf(!allPresent)("extractText (PDF)", () => {
     await expect(extractText(buffer, PDF_MIME)).rejects.toThrow("empty_text");
   });
 
-  it("strips pdf-parse v2 page markers from content PDFs", async () => {
-    // Regression guard: content PDFs must not leak the "-- 1 of 1 --" delimiter
-    // into the text that gets sent to the LLM.
+  it("extracts clean text without internal library artifacts", async () => {
+    // Regression guard: extracted text must not leak internal parser artifacts
+    // (page markers, debug strings, etc.) into the text sent to the LLM.
     const buffer = readFileSync(fixtures.sparse);
     const result = await extractText(buffer, PDF_MIME);
+    // unpdf returns clean text; verify no common parser artifacts
     expect(result.text).not.toMatch(/--\s*\d+\s+of\s+\d+\s*--/);
   });
 
@@ -62,14 +63,25 @@ describe("extractText (errors)", () => {
   });
 });
 
-describe("extractText (canvas polyfill)", () => {
-  it("does not throw DOMMatrix errors with minimal PDF", async () => {
-    // Regression test for production DOMMatrix error.
-    // @napi-rs/canvas polyfills DOMMatrix for Node.js serverless environments.
-    // This test verifies pdf-parse can initialize without browser globals.
+describe("extractText (serverless compatibility)", () => {
+  it("works without canvas polyfills or DOMMatrix", async () => {
+    // Regression test for production DOMMatrix error (issue #34).
+    // unpdf is designed for serverless and requires NO canvas APIs.
+    // This test verifies PDF parsing works in Node without browser globals.
+    if (allPresent) {
+      const buffer = readFileSync(fixtures.sparse);
+      const result = await extractText(buffer, PDF_MIME);
+      expect(result.text).toBeTruthy();
+      expect(result.text.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("throws clean errors on malformed PDFs, not canvas errors", async () => {
+    // Even with broken PDFs, we should get library-specific errors,
+    // never "DOMMatrix is not defined" or similar canvas/DOM errors.
     if (allPresent) {
       const buffer = readFileSync(fixtures.blank);
-      // blank PDF has no text, so we expect empty_text error, NOT DOMMatrix error
+      // blank PDF has no text, so we expect empty_text error
       await expect(extractText(buffer, PDF_MIME)).rejects.toThrow("empty_text");
     }
   });
