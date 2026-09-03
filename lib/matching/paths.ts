@@ -26,12 +26,20 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
     r.total_score >= 70,
   );
 
-  const growth = findRank((r, occ) =>
-    (r.breakdown.interests ?? 0) >= 65 &&
-    occ.constraints.typical_training_months >= 6 &&
-    occ.constraints.typical_training_months <= 24 &&
-    (occ.market.demand_he === "medium" || occ.market.demand_he === "high" || occ.market.demand_he === "very_high"),
-  );
+  // Growth path: prefer interest-driven (≥65) when interests exists, 
+  // fall back to total_score (≥70) when interests is null (chat+CV profile).
+  // Requires 6-24 month training + medium+ demand.
+  const growth = findRank((r, occ) => {
+    const interestScore = r.breakdown.interests;
+    const meetsInterestThreshold = interestScore !== null 
+      ? interestScore >= 65 
+      : r.total_score >= 70; // fallback for chat+CV profiles without RIASEC
+    
+    return meetsInterestThreshold &&
+      occ.constraints.typical_training_months >= 6 &&
+      occ.constraints.typical_training_months <= 24 &&
+      (occ.market.demand_he === "medium" || occ.market.demand_he === "high" || occ.market.demand_he === "very_high");
+  });
 
   const wildcard = findRank((r) =>
     r.total_score >= 60,
