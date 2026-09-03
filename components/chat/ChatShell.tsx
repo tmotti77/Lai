@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { DisclaimerBanner } from "./DisclaimerBanner";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { ConsentDialog } from "./ConsentDialog";
+import { Button } from "@/components/ui/button";
 import { he } from "@/lib/i18n/he";
 
-export function ChatShell({ initialMessages = [] }: { initialMessages?: UIMessage[] }) {
+type Props = {
+  initialMessages?: UIMessage[];
+  initialStage?: string;
+};
+
+export function ChatShell({ initialMessages = [], initialStage = "onboarding" }: Props) {
+  const [currentStage, setCurrentStage] = useState<string>(initialStage);
+  
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     messages: initialMessages,
@@ -17,6 +26,25 @@ export function ChatShell({ initialMessages = [] }: { initialMessages?: UIMessag
 
   const isLoading = status === "submitted" || status === "streaming";
   const isResumed = initialMessages.length > 0;
+  const showRecommendationsCta = currentStage === "complete";
+
+  // Fetch stage after each turn completes (when loading stops)
+  const prevLoadingRef = useRef(false);
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = isLoading;
+    
+    if (wasLoading && !isLoading && messages.length > 0) {
+      fetch("/api/chat/stage")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.stage) setCurrentStage(data.stage);
+        })
+        .catch(() => {
+          // Ignore fetch errors — stage display is non-critical
+        });
+    }
+  }, [isLoading, messages.length]);
 
   return (
     <div className="mx-auto flex h-dvh max-w-2xl flex-col">
@@ -62,6 +90,16 @@ export function ChatShell({ initialMessages = [] }: { initialMessages?: UIMessag
       {error && (
         <div className="border-t border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {he.chat.error.generic}
+        </div>
+      )}
+
+      {showRecommendationsCta && (
+        <div className="border-t border-border bg-primary/5 px-4 py-3">
+          <Button asChild className="w-full">
+            <Link href="/recommendations">
+              לדף ההמלצות
+            </Link>
+          </Button>
         </div>
       )}
 

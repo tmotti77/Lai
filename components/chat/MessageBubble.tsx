@@ -29,8 +29,9 @@ export function normalizePath(path: string): string {
 function parseMarkdown(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   // Combined regex: match **bold** OR [link](url) OR bare recommendations paths
-  // Bare path pattern: /recommendations or recommendations/ (with optional trailing slash, word boundaries)
-  const regex = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|(?:^|\s)(\/?\s*recommendations\/?)(?=\s|$)/gi;
+  // Bare path pattern: /recommendations or recommendations/ (with optional trailing slash)
+  // Lookahead allows trailing punctuation (.,:;!?)\]*) or whitespace/end, but doesn't consume it
+  const regex = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|(?:^|\s)(\/?\s*recommendations\/?)(?=[\s.,;:!?\)\]*]|$)/gi;
   let lastIndex = 0;
   let match;
 

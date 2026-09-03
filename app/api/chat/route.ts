@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     ? [...historyAsModelMessages, { role: "user", content: userText }]
     : historyAsModelMessages;
 
-  const setCookie = `${ACTIVE_CONVERSATION_COOKIE}=${conversation.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ACTIVE_CONVERSATION_MAX_AGE_SECONDS}${
+  const conversationCookie = `${ACTIVE_CONVERSATION_COOKIE}=${conversation.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${ACTIVE_CONVERSATION_MAX_AGE_SECONDS}${
     process.env.NODE_ENV === "production" ? "; Secure" : ""
   }`;
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     responseHeaders: {
       "x-conversation-id": conversation.id,
       "x-stage": currentStage,
-      "Set-Cookie": setCookie,
+      "Set-Cookie": conversationCookie,
     },
     onUserPersist: async (text, safetyFlag) => {
       await appendMessage({
@@ -113,11 +113,11 @@ export async function POST(req: Request) {
       // future turns because Anthropic rejects empty text content blocks.
       // Skip the persist when there's nothing to say.
       if (args.text && args.text.trim().length > 0) {
-        // When advancing to complete, ensure the message has a clickable link
+        // When advancing to complete OR from wrap, ensure the message has a clickable link
         // to /recommendations. The model sometimes emits bare paths (e.g., "פנה ל- /recommendations")
         // which MessageBubble can't detect as links. This guarantees a proper markdown link exists.
         let finalText = args.text;
-        if (advancedToStage === "complete") {
+        if (advancedToStage === "complete" || (advancedToStage && currentStage === "wrap")) {
           finalText = ensureRecommendationsLink(args.text);
         }
 

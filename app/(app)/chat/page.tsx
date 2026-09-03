@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
 import { loadMessages } from "@/lib/db/queries";
+import { isValidStage, type Stage } from "@/lib/ai/stages";
 import type { UIMessage } from "ai";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,11 @@ const ACTIVE_CONVERSATION_COOKIE = "co_conv";
  * If any step fails, we return [] and the chat starts fresh — defensive
  * fallback that never blocks the chat from rendering.
  */
-async function loadInitialMessages(): Promise<UIMessage[]> {
+async function loadInitialMessages(): Promise<{ messages: UIMessage[]; stage: Stage }> {
   try {
     const cookieStore = await cookies();
     const conversationId = cookieStore.get(ACTIVE_CONVERSATION_COOKIE)?.value;
-    if (!conversationId) return [];
+    if (!conversationId) return { messages: [], stage: "onboarding" };
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -39,26 +40,30 @@ async function loadInitialMessages(): Promise<UIMessage[]> {
     const svc = createServiceClient();
     const { data: conv } = await svc
       .from("conversations")
-      .select("id")
+      .select("id, stage")
       .eq("id", conversationId)
       .eq("user_id", internalUserId)
       .maybeSingle();
-    if (!conv) return [];
+    if (!conv) return { messages: [], stage: "onboarding" };
+
+    const stage: Stage = conv.stage && isValidStage(conv.stage) ? conv.stage : "onboarding";
 
     const rows = await loadMessages(conversationId);
-    return rows
+    const messages = rows
       .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim().length > 0)
       .map((m, idx): UIMessage => ({
         id: `loaded-${idx}`,
         role: m.role as "user" | "assistant",
         parts: [{ type: "text", text: m.content }],
       }));
+    
+    return { messages, stage };
   } catch {
-    return [];
+    return { messages: [], stage: "onboarding" };
   }
 }
 
 export default async function ChatPage() {
-  const initialMessages = await loadInitialMessages();
-  return <ChatShell initialMessages={initialMessages} />;
+  const { messages, stage } = await loadInitialMessages();
+  return <ChatShell initialMessages={messages} initialStage={stage} />;
 }
