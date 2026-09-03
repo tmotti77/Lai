@@ -17,10 +17,13 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
     return null;
   };
 
+  // Safe path: high constraints fit + short training + high demand + reasonable overall match.
+  // total_score ≥ 70 prevents occupations that only match on constraints (e.g., PM for a hands-on profile).
   const safe = findRank((r, occ) =>
     (r.breakdown.constraints ?? 0) >= 70 &&
     occ.constraints.typical_training_months <= 12 &&
-    (occ.market.demand_he === "high" || occ.market.demand_he === "very_high"),
+    (occ.market.demand_he === "high" || occ.market.demand_he === "very_high") &&
+    r.total_score >= 70,
   );
 
   const growth = findRank((r, occ) =>
