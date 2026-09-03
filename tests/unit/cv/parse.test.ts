@@ -61,3 +61,16 @@ describe("extractText (errors)", () => {
     await expect(extractText(buffer, "image/png")).rejects.toThrow("unsupported_mime");
   });
 });
+
+describe("extractText (canvas polyfill)", () => {
+  it("does not throw DOMMatrix errors with minimal PDF", async () => {
+    // Regression test for production DOMMatrix error.
+    // @napi-rs/canvas polyfills DOMMatrix for Node.js serverless environments.
+    // This test verifies pdf-parse can initialize without browser globals.
+    if (allPresent) {
+      const buffer = readFileSync(fixtures.blank);
+      // blank PDF has no text, so we expect empty_text error, NOT DOMMatrix error
+      await expect(extractText(buffer, PDF_MIME)).rejects.toThrow("empty_text");
+    }
+  });
+});

@@ -124,21 +124,25 @@ export async function POST(req: Request) {
         });
       }
 
+      // Run extraction BEFORE the stream returns so the profile is ready when
+      // the user navigates to /recommendations. Prior async fire-and-forget
+      // caused a race where the page loaded before extraction completed.
       if (advancedToStage && EXTRACTION_STAGES.has(currentStage)) {
         const stageJustCompleted = currentStage;
-        runExtraction({
-          userId: internalUserId,
-          conversationId: conversation.id,
-          stage: stageJustCompleted,
-        })
-          .then(() =>
-            console.log(`[chat] extraction done conv=${conversation.id} stage=${stageJustCompleted}`),
-          )
-          .catch((err) =>
-            console.error(
-              `[chat] extraction failed conv=${conversation.id} stage=${stageJustCompleted} error=${err instanceof Error ? err.message : String(err)}`,
-            ),
+        try {
+          await runExtraction({
+            userId: internalUserId,
+            conversationId: conversation.id,
+            stage: stageJustCompleted,
+          });
+          console.log(`[chat] extraction done conv=${conversation.id} stage=${stageJustCompleted}`);
+        } catch (err) {
+          // Log but don't block the response — extraction failure shouldn't
+          // prevent the user from continuing, though recommendations may be incomplete.
+          console.error(
+            `[chat] extraction failed conv=${conversation.id} stage=${stageJustCompleted} error=${err instanceof Error ? err.message : String(err)}`,
           );
+        }
       }
     },
     onError: async (error) => {
