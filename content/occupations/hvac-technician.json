@@ -1,0 +1,36 @@
+{
+  "id": "hvac-technician",
+  "title_he": "טכנאי/ת מיזוג אוויר",
+  "title_en": "HVAC Technician",
+  "description_he": "התקנה, תחזוקה ותיקון של מערכות מיזוג אוויר ומערכות קירור במבנים מגורים ומסחריים. מקצוע מבוקש בישראל בגלל האקלים, עם ביקוש גבוה בעונות החמות. שילוב של עבודת ידיים עם ידע טכני בחשמל וגזים. אפשרות לעבודה עצמאית או כשכיר/ה.",
+  "riasec_affinity": { "R": 0.95, "I": 0.45, "A": 0.10, "S": 0.25, "E": 0.35, "C": 0.60 },
+  "required_skills": [
+    { "skill_id": "hvac-systems", "importance": 1.0 },
+    { "skill_id": "tool-use", "importance": 0.9 },
+    { "skill_id": "electrical-systems", "importance": 0.75 },
+    { "skill_id": "problem-solving", "importance": 0.8 },
+    { "skill_id": "manual-dexterity", "importance": 0.85 }
+  ],
+  "desired_skills": [
+    { "skill_id": "customer-service", "importance": 0.5 },
+    { "skill_id": "safety", "importance": 0.75 },
+    { "skill_id": "physical-stamina", "importance": 0.6 }
+  ],
+  "values_fit": ["money", "stability", "freedom"],
+  "big5_fit": { "C": 65 },
+  "constraints": {
+    "typical_training_months": 9,
+    "typical_training_cost_nis": 12000,
+    "requires_english_level": "none",
+    "remote_ok": false,
+    "typical_locations": ["כל הארץ"]
+  },
+  "market": {
+    "demand_he": "high",
+    "typical_salary_nis_min": 11000,
+    "typical_salary_nis_max": 26000,
+    "ai_risk": "low"
+  },
+  "data_source": "public_knowledge_v1_2026-05",
+  "last_verified_at": "2026-09-03"
+}

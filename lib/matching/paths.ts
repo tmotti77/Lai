@@ -18,15 +18,15 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
   };
 
   const safe = findRank((r, occ) =>
-    (r.breakdown.constraints ?? 0) >= 75 &&
-    occ.constraints.typical_training_months <= 6 &&
+    (r.breakdown.constraints ?? 0) >= 70 &&
+    occ.constraints.typical_training_months <= 12 &&
     (occ.market.demand_he === "high" || occ.market.demand_he === "very_high"),
   );
 
   const growth = findRank((r, occ) =>
-    (r.breakdown.interests ?? 0) >= 70 &&
+    (r.breakdown.interests ?? 0) >= 65 &&
     occ.constraints.typical_training_months >= 6 &&
-    occ.constraints.typical_training_months <= 18 &&
+    occ.constraints.typical_training_months <= 24 &&
     (occ.market.demand_he === "medium" || occ.market.demand_he === "high" || occ.market.demand_he === "very_high"),
   );
 
