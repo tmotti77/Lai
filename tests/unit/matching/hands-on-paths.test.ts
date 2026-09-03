@@ -81,6 +81,45 @@ describe("hands-on post-army matching", () => {
     expect(paths.safe).toBe("electrician");
   });
 
+  it("should NOT match PM as safe if total_score < 70 even when constraints are high", () => {
+    const occs = [
+      fakeOcc({
+        id: "product-manager",
+        constraints: {
+          typical_training_months: 6,
+          typical_training_cost_nis: 8000,
+          requires_english_level: "intermediate",
+          remote_ok: true,
+          typical_locations: [],
+        },
+        market: { demand_he: "high", typical_salary_nis_min: 18000, typical_salary_nis_max: 35000, ai_risk: "medium" },
+        riasec_affinity: { R: 0.2, I: 0.6, A: 0.4, S: 0.5, E: 0.8, C: 0.5 },
+      }),
+      fakeOcc({
+        id: "electrician",
+        constraints: {
+          typical_training_months: 12,
+          typical_training_cost_nis: 12000,
+          requires_english_level: "none",
+          remote_ok: false,
+          typical_locations: [],
+        },
+        market: { demand_he: "high", typical_salary_nis_min: 12000, typical_salary_nis_max: 25000, ai_risk: "low" },
+      }),
+    ];
+
+    const rankings = [
+      rank("product-manager", 65, { constraints: 75, interests: 50, skills: 60 }),
+      rank("electrician", 80, { constraints: 72, interests: 85, skills: 80 }),
+    ];
+
+    const paths = pickPaths(rankings, occs);
+    
+    // PM has high constraints but total < 70, so electrician should be safe
+    expect(paths.safe).toBe("electrician");
+    expect(paths.safe).not.toBe("product-manager");
+  });
+
   it("should match HVAC technician with 9 months training as safe path", () => {
     const occs = [
       fakeOcc({
