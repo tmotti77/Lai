@@ -129,7 +129,7 @@ describe("pickPaths", () => {
     // Safe: hvac-tech (constraints 90, training ≤12mo, high demand, total 82 ≥70)
     expect(paths.safe).toBe("hvac-tech");
     
-    // Growth: electrician (no interests but total 78 ≥70, training 12mo in 6-24 range, high demand)
+    // Growth: electrician (no interests but total 78 ≥60, training 12mo in 3-36 range, high demand)
     // Should NOT be null even though interests is null
     expect(paths.growth).toBe("electrician");
     
@@ -176,7 +176,7 @@ describe("pickPaths", () => {
     expect(paths.growth).toBe("electrician");
   });
 
-  it("returns null growth when no occupation meets criteria", () => {
+  it("returns null growth when only one candidate exists (used by safe)", () => {
     const rankings: Ranking[] = [
       {
         occupation_id: "hvac-tech",
@@ -198,5 +198,158 @@ describe("pickPaths", () => {
     // Only hvac-tech used by safe, no other candidates for growth
     expect(paths.safe).toBe("hvac-tech");
     expect(paths.growth).toBeNull();
+  });
+
+  it("fills growth with 60-69 score when interests is null (closes gap with wildcard)", () => {
+    const rankings: Ranking[] = [
+      {
+        occupation_id: "hvac-tech",
+        total_score: 82,
+        breakdown: {
+          interests: null,
+          skills: 85,
+          values: null,
+          big5: null,
+          constraints: 90,
+          market: 75,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "electrician",
+        total_score: 65, // In the 60-69 gap
+        breakdown: {
+          interests: null,
+          skills: 70,
+          values: null,
+          big5: null,
+          constraints: 75,
+          market: 60,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "plumber",
+        total_score: 62, // Also in gap
+        breakdown: {
+          interests: null,
+          skills: 68,
+          values: null,
+          big5: null,
+          constraints: 70,
+          market: 58,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+    ];
+
+    const paths = pickPaths(rankings, mockOccupations);
+
+    // Safe: hvac-tech (constraints 90, training 6mo, high demand, total 82 ≥70)
+    expect(paths.safe).toBe("hvac-tech");
+    
+    // Growth: electrician (total 65 ≥60, training 12mo in 3-36 range, high demand)
+    // Previously this would be null (70 threshold), now filled (60 threshold)
+    expect(paths.growth).toBe("electrician");
+    
+    // Wildcard: plumber (total 62 ≥60)
+    expect(paths.wildcard).toBe("plumber");
+  });
+
+  it("uses fallback guarantee when no occupation meets primary growth criteria", () => {
+    // All occupations have very short training (< 3 months) so they don't match primary growth
+    const shortTrainingOccs: Occupation[] = [
+      {
+        id: "quick-cert",
+        title_he: "קורס קצר",
+        title_en: "Quick Cert",
+        description_he: "הכשרה קצרה",
+        riasec_affinity: { R: 0.7, I: 0.3, A: 0.1, S: 0.4, E: 0.2, C: 0.3 },
+        required_skills: [],
+        desired_skills: [],
+        values_fit: ["stability"],
+        constraints: {
+          typical_training_months: 2, // Too short for primary growth
+          typical_training_cost_nis: 5000,
+          requires_english_level: "basic",
+          remote_ok: false,
+          typical_locations: ["center"],
+        },
+        market: {
+          demand_he: "high",
+          typical_salary_nis_min: 7000,
+          typical_salary_nis_max: 12000,
+          ai_risk: "low",
+        },
+        data_source: "test",
+        last_verified_at: "2026-05-01",
+      },
+      {
+        id: "another-quick",
+        title_he: "עוד קורס קצר",
+        title_en: "Another Quick",
+        description_he: "הכשרה קצרה נוספת",
+        riasec_affinity: { R: 0.6, I: 0.4, A: 0.1, S: 0.3, E: 0.2, C: 0.3 },
+        required_skills: [],
+        desired_skills: [],
+        values_fit: ["autonomy"],
+        constraints: {
+          typical_training_months: 1, // Too short for primary growth
+          typical_training_cost_nis: 3000,
+          requires_english_level: "none",
+          remote_ok: false,
+          typical_locations: ["center"],
+        },
+        market: {
+          demand_he: "medium",
+          typical_salary_nis_min: 6000,
+          typical_salary_nis_max: 10000,
+          ai_risk: "low",
+        },
+        data_source: "test",
+        last_verified_at: "2026-05-01",
+      },
+    ];
+
+    const rankings: Ranking[] = [
+      {
+        occupation_id: "quick-cert",
+        total_score: 75,
+        breakdown: {
+          interests: null,
+          skills: 80,
+          values: null,
+          big5: null,
+          constraints: 85,
+          market: 70,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "another-quick",
+        total_score: 68,
+        breakdown: {
+          interests: null,
+          skills: 72,
+          values: null,
+          big5: null,
+          constraints: 75,
+          market: 65,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+    ];
+
+    const paths = pickPaths(rankings, shortTrainingOccs);
+
+    // Safe: quick-cert (constraints 85, training 2mo ≤12, high demand, total 75 ≥70)
+    expect(paths.safe).toBe("quick-cert");
+    
+    // Growth: fallback guarantee assigns another-quick (total 68 ≥60, unused)
+    // Primary growth criteria failed (training too short), but guarantee fills it
+    expect(paths.growth).toBe("another-quick");
+    
+    // Wildcard: null (all candidates already used)
+    expect(paths.wildcard).toBeNull();
   });
 });
