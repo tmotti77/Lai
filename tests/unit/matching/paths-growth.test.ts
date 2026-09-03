@@ -486,4 +486,87 @@ describe("pickPaths", () => {
     // Wildcard: electrician (next highest unused total_score 82≥60)
     expect(paths.wildcard).toBe("electrician");
   });
+
+  it("security-systems safe → plumber growth case (PR #44 production bug)", () => {
+    // Real production case: security-systems picked as safe, then growth was null, wildcard was plumber
+    // This should NOT happen - growth should pick plumber before wildcard gets it
+    const securitySystems: Occupation = {
+      id: "security-systems-installer",
+      title_he: "טכנאי מערכות אבטחה",
+      title_en: "Security Systems Installer",
+      description_he: "התקנת מערכות אבטחה",
+      riasec_affinity: { R: 0.9, I: 0.55, A: 0.1, S: 0.3, E: 0.35, C: 0.7 },
+      required_skills: [],
+      desired_skills: [],
+      values_fit: ["money", "stability"],
+      constraints: {
+        typical_training_months: 6,
+        typical_training_cost_nis: 8000,
+        requires_english_level: "basic",
+        remote_ok: false,
+        typical_locations: ["center"],
+      },
+      market: {
+        demand_he: "high",
+        typical_salary_nis_min: 10000,
+        typical_salary_nis_max: 24000,
+        ai_risk: "low",
+      },
+      data_source: "test",
+      last_verified_at: "2026-09-03",
+    };
+
+    const rankings: Ranking[] = [
+      {
+        occupation_id: "security-systems-installer",
+        total_score: 85,
+        breakdown: {
+          interests: null,
+          skills: 82,
+          values: null,
+          big5: null,
+          constraints: 90,
+          market: 83,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "plumber",
+        total_score: 80,
+        breakdown: {
+          interests: null,
+          skills: 78,
+          values: null,
+          big5: null,
+          constraints: 85,
+          market: 77,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+      {
+        occupation_id: "electrician",
+        total_score: 75,
+        breakdown: {
+          interests: null,
+          skills: 73,
+          values: null,
+          big5: null,
+          constraints: 80,
+          market: 72,
+        },
+        weights_used: { skills: 40, constraints: 40, market: 20 },
+      },
+    ];
+
+    const paths = pickPaths(rankings, [securitySystems, ...mockOccupations]);
+
+    // Safe: security-systems-installer (constraints 90≥70, training 6mo≤12, high demand, total 85≥70)
+    expect(paths.safe).toBe("security-systems-installer");
+    
+    // Growth: plumber (total 80≥60, training 18mo in 3-36, high demand) - MUST NOT BE NULL
+    expect(paths.growth).toBe("plumber");
+    
+    // Wildcard: electrician (next highest unused total_score 75≥60)
+    expect(paths.wildcard).toBe("electrician");
+  });
 });
