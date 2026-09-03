@@ -15,10 +15,16 @@ import { inferArchetype } from "@/lib/cv/archetype";
 // ---------------------------------------------------------------------------
 
 /**
- * Reads the LATEST career_profile row for the user (ordered by updated_at desc),
+ * Reads the profile row for the user's latest conversation (if one exists),
  * applies the first-CV-confirm archive rule, then updates ONLY that specific row
  * by its id — not every row for the user.
  *
+ * **FIX**: This function now looks up the latest conversation and merges CV skills
+ * into the SAME profile row that chat extraction writes to. Previously it only
+ * looked up by updated_at, which could target a different profile row, causing
+ * recommendations to show empty data even after CV upload.
+ *
+ * If no conversation exists, falls back to the latest profile row by updated_at.
  * If no profile row exists yet, inserts a new one.
  */
 export async function mergeCvSkillsIntoLatestProfile(
@@ -27,19 +33,50 @@ export async function mergeCvSkillsIntoLatestProfile(
 ): Promise<void> {
   const svc = createServiceClient();
 
-  const { data: profile, error: readErr } = await svc
-    .from("career_profile")
-    .select("id, data")
+  // First, try to find the profile linked to the user's latest conversation.
+  // This ensures CV skills merge with chat-extracted data in the same row.
+  const { data: convs } = await svc
+    .from("conversations")
+    .select("id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (readErr) throw new Error(`mergeCvSkillsIntoLatestProfile read: ${readErr.message}`);
+    .limit(1);
+  const latestConversationId = convs?.[0]?.id;
+
+  let profile: { id: string; data: unknown } | null = null;
+  let readErr: unknown = null;
+
+  if (latestConversationId) {
+    const { data, error } = await svc
+      .from("career_profile")
+      .select("id, data")
+      .eq("user_id", userId)
+      .eq("conversation_id", latestConversationId)
+      .maybeSingle();
+    profile = data;
+    readErr = error;
+  }
+
+  // Fall back to latest profile by updated_at if no conversation profile exists
+  if (!profile) {
+    const { data, error } = await svc
+      .from("career_profile")
+      .select("id, data")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    profile = data;
+    readErr = error;
+  }
+
+  if (readErr) throw new Error(`mergeCvSkillsIntoLatestProfile read: ${(readErr as { message: string }).message}`);
 
   if (!profile) {
-    // No profile yet — insert. conversation_id is unknown at this point; leave null.
+    // No profile yet — insert. Link to latest conversation if one exists.
     const { error: insErr } = await svc.from("career_profile").insert({
       user_id: userId,
+      conversation_id: latestConversationId ?? null,
       data: { skills, skills_from_chat: [] },
     });
     if (insErr) throw new Error(`mergeCvSkillsIntoLatestProfile insert: ${insErr.message}`);
