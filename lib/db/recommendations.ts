@@ -86,3 +86,17 @@ export async function getLatestRecommendationForUser(
     generatedAt: data.generated_at,
   };
 }
+
+/**
+ * Deletes all cached recommendation rows for the given user.
+ * Use this when the user's profile changes significantly (e.g., CV upload)
+ * to force fresh recommendations on next visit.
+ */
+export async function invalidateUserRecommendations(userId: string): Promise<void> {
+  const svc = createServiceClient();
+  const { error } = await svc
+    .from("recommendations")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}

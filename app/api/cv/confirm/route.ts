@@ -9,6 +9,7 @@ import taxonomyJson from "@/content/skills/taxonomy.json";
 import { requireConsent, NoConsentError } from "@/lib/consent";
 import { track, skillCountBucket } from "@/lib/analytics";
 import { inferArchetype } from "@/lib/cv/archetype";
+import { invalidateUserRecommendations } from "@/lib/db/recommendations";
 
 // ---------------------------------------------------------------------------
 // Exported helper (also used by tests)
@@ -197,6 +198,15 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: "profile_update_failed", message }, { status: 500 });
+  }
+
+  // Invalidate cached recommendations so the user sees fresh matches
+  // reflecting their newly confirmed CV skills on next /recommendations visit.
+  try {
+    await invalidateUserRecommendations(userId);
+  } catch (err) {
+    // Log but don't block — cache invalidation failure shouldn't prevent CV confirm.
+    console.error("[cv/confirm] failed to invalidate recommendations cache", err);
   }
 
   const skillCategories = confirmedSkills
