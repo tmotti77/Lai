@@ -6,8 +6,25 @@ type Props = {
   text: string;
 };
 
+// Normalize path: if it looks like a relative app route (starts with letter, contains /),
+// add leading slash so Next Link routes correctly. Leaves absolute URLs unchanged.
+// Exported for testing.
+export function normalizePath(path: string): string {
+  if (!path) return path;
+  // Already absolute URL (http/https) or root-relative (starts with /)
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
+    return path;
+  }
+  // Relative path like "recommendations/" → "/recommendations"
+  if (/^[a-z]/i.test(path)) {
+    return "/" + path.replace(/\/$/, ""); // add leading slash, strip trailing
+  }
+  return path;
+}
+
 // Simple markdown parser: [text](url) → <Link>, **text** → <strong>
 // Handles nested patterns like **[link](url)** by stripping bold markers around links.
+// Normalizes relative paths (recommendations/ → /recommendations).
 function parseMarkdown(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   // Combined regex: match **bold** OR [link](url)
@@ -31,7 +48,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
         parts.push(
           <Link
             key={match.index}
-            href={linkMatch[2]}
+            href={normalizePath(linkMatch[2])}
             className="underline hover:text-primary-foreground/80"
           >
             {linkMatch[1]}
@@ -46,7 +63,7 @@ function parseMarkdown(text: string): React.ReactNode[] {
       parts.push(
         <Link
           key={match.index}
-          href={match[3]}
+          href={normalizePath(match[3])}
           className="underline hover:text-primary-foreground/80"
         >
           {match[2]}
