@@ -22,13 +22,15 @@ export function normalizePath(path: string): string {
   return path;
 }
 
-// Simple markdown parser: [text](url) → <Link>, **text** → <strong>
+// Simple markdown parser: [text](url) → <Link>, **text** → <strong>, bare /recommendations → <Link>
 // Handles nested patterns like **[link](url)** by stripping bold markers around links.
 // Normalizes relative paths (recommendations/ → /recommendations).
+// Auto-links bare paths like "/recommendations" or "recommendations/" that the model emits without markdown.
 function parseMarkdown(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  // Combined regex: match **bold** OR [link](url)
-  const regex = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+  // Combined regex: match **bold** OR [link](url) OR bare recommendations paths
+  // Bare path pattern: /recommendations or recommendations/ (with optional trailing slash, word boundaries)
+  const regex = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|(?:^|\s)(\/?\s*recommendations\/?)(?=\s|$)/gi;
   let lastIndex = 0;
   let match;
 
@@ -67,6 +69,22 @@ function parseMarkdown(text: string): React.ReactNode[] {
           className="underline hover:text-primary-foreground/80"
         >
           {match[2]}
+        </Link>
+      );
+    } else if (match[4]) {
+      // Bare path pattern: /recommendations or recommendations/
+      // Add preceding whitespace if it was captured
+      const precedingSpace = match[0].match(/^\s/)?.[0] || "";
+      if (precedingSpace) {
+        parts.push(precedingSpace);
+      }
+      parts.push(
+        <Link
+          key={match.index}
+          href={normalizePath(match[4])}
+          className="underline hover:text-primary-foreground/80"
+        >
+          {match[4].trim()}
         </Link>
       );
     }
