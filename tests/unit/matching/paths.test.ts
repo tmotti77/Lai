@@ -22,28 +22,28 @@ const rank = (id: string, total: number, breakdown: Partial<Ranking["breakdown"]
 });
 
 describe("pickPaths", () => {
-  it("picks safe = highest with constraints>=75 + short training + high demand", () => {
+  it("picks safe = highest with constraints>=70 + training<=12mo + high demand", () => {
     const occs = [
       fakeOcc({ id: "long-train", constraints: { typical_training_months: 24, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
-      fakeOcc({ id: "short-train", constraints: { typical_training_months: 3, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
+      fakeOcc({ id: "short-train", constraints: { typical_training_months: 9, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
     ];
     const rankings = [
       rank("long-train", 80, { constraints: 90, interests: 70 }),
-      rank("short-train", 70, { constraints: 85, interests: 70 }),
+      rank("short-train", 70, { constraints: 75, interests: 70 }),
     ];
     const paths = pickPaths(rankings, occs);
     expect(paths.safe).toBe("short-train");
   });
 
-  it("picks growth = next-best with interests>=70 and 6-18 month training", () => {
+  it("picks growth = next-best with interests>=65 and 6-24 month training", () => {
     const occs = [
-      fakeOcc({ id: "safe-pick", constraints: { typical_training_months: 3, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
-      fakeOcc({ id: "growth-pick", constraints: { typical_training_months: 12, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
+      fakeOcc({ id: "safe-pick", constraints: { typical_training_months: 9, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
+      fakeOcc({ id: "growth-pick", constraints: { typical_training_months: 18, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
       fakeOcc({ id: "too-long", constraints: { typical_training_months: 36, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] } }),
     ];
     const rankings = [
-      rank("safe-pick", 90, { constraints: 90, interests: 80 }),
-      rank("growth-pick", 80, { constraints: 60, interests: 80 }),
+      rank("safe-pick", 90, { constraints: 85, interests: 80 }),
+      rank("growth-pick", 80, { constraints: 60, interests: 75 }),
       rank("too-long", 75, { constraints: 60, interests: 80 }),
     ];
     const paths = pickPaths(rankings, occs);

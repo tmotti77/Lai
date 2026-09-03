@@ -14,8 +14,12 @@ export async function extractText(
 
   if (mimeType === "application/pdf") {
     // pdf-parse v2 uses a class-based API.
+    // useWorkerFetch: false disables DOM-based worker which causes DOMMatrix errors in Node
     const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: buffer });
+    const parser = new PDFParse({ 
+      data: buffer,
+      useWorkerFetch: false,
+    });
     try {
       const result = await parser.getText();
       raw = result.text;
