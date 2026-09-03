@@ -106,6 +106,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Force regenerate: delete old recommendations for this user before inserting new one
+    if (force) {
+      const svc = createServiceClient();
+      await svc
+        .from("recommendations")
+        .delete()
+        .eq("user_id", internalUserId);
+    }
+
     await saveRecommendation({
       userId: internalUserId,
       profileHash: hash,
@@ -117,7 +126,7 @@ export async function POST(request: NextRequest) {
     const svc = createServiceClient();
     const { data: recRow } = await svc
       .from("recommendations")
-      .select("id")
+      .select("id, generated_at")
       .eq("user_id", internalUserId)
       .eq("profile_hash", hash)
       .order("generated_at", { ascending: false })
@@ -125,6 +134,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const recommendationId = recRow!.id;
+    const generatedAt = recRow!.generated_at;
     // Fresh recommendations have no thumbs yet
     const thumbs: Record<string, -1 | 1> = {};
 
@@ -138,6 +148,7 @@ export async function POST(request: NextRequest) {
       paths,
       prose,
       cached: false,
+      generated_at: generatedAt,
       recommendation_id: recommendationId,
       thumbs,
     });
@@ -148,8 +159,24 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Loads and merges profile data from BOTH conversation-linked AND orphan (conversation_id=NULL) rows.
+ * 
+ * **Why this merge is needed:**
+ * Anonymous users often have CV skills stored in a `career_profile` row with `conversation_id = NULL`,
+ * while chat-extracted interests/values/constraints live in a conversation-linked row.
+ * The old code only read the conversation-linked row, so CV skills were invisible to matching.
+ * 
+ * **Merge strategy:**
+ * - Union skills from both rows
+ * - Prefer non-null interests/values/constraints from conversation-linked row (chat is authoritative)
+ * - If only orphan row exists, use it fully
+ * - Return formal assessments from any existing submission
+ */
 async function getMostRecentConversationProfile(userId: string) {
   const svc = createServiceClient();
+  
+  // Load latest conversation to check if conversation-linked profile exists
   const { data: convs } = await svc
     .from("conversations")
     .select("id")
@@ -157,7 +184,15 @@ async function getMostRecentConversationProfile(userId: string) {
     .order("updated_at", { ascending: false })
     .limit(1);
   const conversationId = convs?.[0]?.id;
+
+  // Load formal assessments (always user-level, no conversation filter)
+  const formal = await getProfile(userId, "00000000-0000-0000-0000-000000000000")
+    .catch(() => null);
+  type ProfileWithFormal = { formal?: { riasec: unknown; big5: unknown; values: unknown; constraints: unknown } | null };
+  const formalData = (formal as ProfileWithFormal | null)?.formal ?? null;
+
   if (!conversationId) {
+    // No conversation → use latest profile row by updated_at (includes NULL conversation_id)
     const { data: cp } = await svc
       .from("career_profile")
       .select("*")
@@ -165,11 +200,79 @@ async function getMostRecentConversationProfile(userId: string) {
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const formal = await getProfile(userId, "00000000-0000-0000-0000-000000000000")
-      .catch(() => null);
-    type ProfileWithFormal = { formal?: { riasec: unknown; big5: unknown; values: unknown; constraints: unknown } | null };
-    const formalData = (formal as ProfileWithFormal | null)?.formal ?? null;
     return cp ? { ...cp, formal: formalData } : { formal: formalData };
   }
-  return getProfile(userId, conversationId);
+
+  // Load BOTH conversation-linked profile AND latest user-level profile
+  const [conversationProfile, userProfile] = await Promise.all([
+    svc
+      .from("career_profile")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("conversation_id", conversationId)
+      .maybeSingle()
+      .then(({ data }) => data),
+    svc
+      .from("career_profile")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => data),
+  ]);
+
+  // If both are the same row, no merge needed
+  if (conversationProfile && userProfile && conversationProfile.id === userProfile.id) {
+    return { ...conversationProfile, formal: formalData };
+  }
+
+  // Merge strategy: union skills, prefer non-null chat fields from conversation profile
+  type ProfileData = {
+    skills?: Array<{ id: string; name_he: string; source?: string; evidence?: string }>;
+    interests?: unknown;
+    values?: unknown;
+    constraints?: unknown;
+    [key: string]: unknown;
+  };
+
+  const convData = (conversationProfile?.data ?? {}) as ProfileData;
+  const userLevelData = (userProfile?.data ?? {}) as ProfileData;
+
+  // Union skills from both sources (dedupe by id)
+  const allSkills = [
+    ...(convData.skills ?? []),
+    ...(userLevelData.skills ?? []),
+  ];
+  const skillMap = new Map(allSkills.map((s) => [s.id, s]));
+  const mergedSkills = Array.from(skillMap.values());
+
+  const mergedData: ProfileData = {
+    ...userLevelData,
+    ...convData,
+    skills: mergedSkills.length > 0 ? mergedSkills : undefined,
+    // Prefer non-null chat-extracted fields from conversation profile
+    interests: convData.interests ?? userLevelData.interests,
+    values: convData.values ?? userLevelData.values,
+    constraints: convData.constraints ?? userLevelData.constraints,
+  };
+
+  // Return shape matching getProfile return type
+  if (conversationProfile) {
+    return {
+      ...conversationProfile,
+      data: mergedData,
+      formal: formalData,
+    };
+  }
+
+  if (userProfile) {
+    return {
+      ...userProfile,
+      data: mergedData,
+      formal: formalData,
+    };
+  }
+
+  return { formal: formalData };
 }
