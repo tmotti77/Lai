@@ -105,9 +105,18 @@ export async function mergeCvSkillsIntoLatestProfile(
     skills_from_chat: archive,
   };
 
+  // CRITICAL FIX: Always set conversation_id on UPDATE to link orphan rows.
+  // Previously we only set it on INSERT, leaving existing NULL rows orphaned.
+  const updatePayload: { data: Json; conversation_id?: string } = {
+    data: mergedData as unknown as Json,
+  };
+  if (latestConversationId) {
+    updatePayload.conversation_id = latestConversationId;
+  }
+
   const { error: updErr } = await svc
     .from("career_profile")
-    .update({ data: mergedData as unknown as Json })
+    .update(updatePayload)
     .eq("id", profile.id); // ← scoped to THIS row, not all user rows
   if (updErr) throw new Error(`mergeCvSkillsIntoLatestProfile update: ${updErr.message}`);
 }
