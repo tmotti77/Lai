@@ -13,10 +13,18 @@ export async function extractText(
   let raw: string;
 
   if (mimeType === "application/pdf") {
+    // CRITICAL: pdf-parse's pdfjs-dist requires canvas APIs in Node.
+    // useWorkerFetch: false avoids DOM-based worker but pdfjs still references DOMMatrix, Path2D, etc.
+    // @napi-rs/canvas provides native implementations; we must polyfill globalThis BEFORE importing pdf-parse.
+    const canvas = await import("@napi-rs/canvas");
+    (globalThis as any).DOMMatrix = canvas.DOMMatrix;
+    (globalThis as any).Path2D = canvas.Path2D;
+    (globalThis as any).ImageData = canvas.ImageData;
+    (globalThis as any).CanvasRenderingContext2D = canvas.CanvasRenderingContext2D;
+
     // pdf-parse v2 uses a class-based API.
-    // useWorkerFetch: false disables DOM-based worker which causes DOMMatrix errors in Node
     const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ 
+    const parser = new PDFParse({
       data: buffer,
       useWorkerFetch: false,
     });
