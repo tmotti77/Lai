@@ -99,7 +99,8 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
   }
   if (!data || data.rankings.length === 0) return <EmptyProfileState />;
 
-  const cachedNote = data.cached && data.generated_at
+  // Only show cached banner when cached is true AND we have a date
+  const cachedNote = data.cached === true && data.generated_at
     ? he.recommendations.cachedNote.replace("{when}", new Date(data.generated_at).toLocaleDateString("he-IL"))
     : null;
 

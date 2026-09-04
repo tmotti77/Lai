@@ -6,3 +6,6 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-role-key";
 process.env.ANTHROPIC_API_KEY = "stub-anthropic-key";
 process.env.ANTHROPIC_MODEL = "claude-stub";
 process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+
+// Import jest-dom matchers for component tests
+import "@testing-library/jest-dom/vitest";

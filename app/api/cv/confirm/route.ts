@@ -9,6 +9,7 @@ import taxonomyJson from "@/content/skills/taxonomy.json";
 import { requireConsent, NoConsentError } from "@/lib/consent";
 import { track, skillCountBucket } from "@/lib/analytics";
 import { inferArchetype } from "@/lib/cv/archetype";
+import { invalidateUserRecommendations } from "@/lib/db/recommendations";
 
 // ---------------------------------------------------------------------------
 // Exported helper (also used by tests)
@@ -104,9 +105,18 @@ export async function mergeCvSkillsIntoLatestProfile(
     skills_from_chat: archive,
   };
 
+  // CRITICAL FIX: Always set conversation_id on UPDATE to link orphan rows.
+  // Previously we only set it on INSERT, leaving existing NULL rows orphaned.
+  const updatePayload: { data: Json; conversation_id?: string } = {
+    data: mergedData as unknown as Json,
+  };
+  if (latestConversationId) {
+    updatePayload.conversation_id = latestConversationId;
+  }
+
   const { error: updErr } = await svc
     .from("career_profile")
-    .update({ data: mergedData as unknown as Json })
+    .update(updatePayload)
     .eq("id", profile.id); // ← scoped to THIS row, not all user rows
   if (updErr) throw new Error(`mergeCvSkillsIntoLatestProfile update: ${updErr.message}`);
 }
@@ -197,6 +207,15 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: "profile_update_failed", message }, { status: 500 });
+  }
+
+  // Invalidate cached recommendations so the user sees fresh matches
+  // reflecting their newly confirmed CV skills on next /recommendations visit.
+  try {
+    await invalidateUserRecommendations(userId);
+  } catch (err) {
+    // Log but don't block — cache invalidation failure shouldn't prevent CV confirm.
+    console.error("[cv/confirm] failed to invalidate recommendations cache", err);
   }
 
   const skillCategories = confirmedSkills

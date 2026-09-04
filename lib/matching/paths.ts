@@ -26,16 +26,22 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
     r.total_score >= 70,
   );
 
-  const growth = findRank((r, occ) =>
-    (r.breakdown.interests ?? 0) >= 65 &&
-    occ.constraints.typical_training_months >= 6 &&
-    occ.constraints.typical_training_months <= 24 &&
+  // Growth path: highest remaining score ≥60.
+  // Soft preference for 3-36 month training + medium+ demand, but ALWAYS fill if any unused ≥60 exists.
+  let growth = findRank((r, occ) =>
+    r.total_score >= 60 &&
+    occ.constraints.typical_training_months >= 3 &&
+    occ.constraints.typical_training_months <= 36 &&
     (occ.market.demand_he === "medium" || occ.market.demand_he === "high" || occ.market.demand_he === "very_high"),
   );
+  
+  // Explicit guarantee: if preferred criteria found nothing, take ANY unused ≥60
+  if (growth === null) {
+    growth = findRank((r) => r.total_score >= 60);
+  }
 
-  const wildcard = findRank((r) =>
-    r.total_score >= 60,
-  );
+  // Wildcard path: next highest remaining score ≥60
+  const wildcard = findRank((r) => r.total_score >= 60);
 
   return { safe, growth, wildcard };
 }
