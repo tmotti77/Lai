@@ -51,11 +51,12 @@ describe("pickPaths", () => {
     expect(paths.growth).toBe("growth-pick");
   });
 
-  it("returns null in slots with no qualifying occupation", () => {
+  it("fills at least one path even with low-quality occupations (updated expectation)", () => {
     const occs = [fakeOcc({ id: "x", constraints: { typical_training_months: 36, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "low", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } })];
     const rankings = [rank("x", 40, { interests: 30, constraints: 30 })];
     const paths = pickPaths(rankings, occs);
-    expect(paths.safe).toBeNull();
+    // With the no-floor fallback, even a single low-quality occupation fills safe
+    expect(paths.safe).toBe("x");
     expect(paths.growth).toBeNull();
     expect(paths.wildcard).toBeNull();
   });
@@ -69,5 +70,38 @@ describe("pickPaths", () => {
     expect(paths.safe).toBe("a");
     expect(paths.growth).toBeNull();
     expect(paths.wildcard).toBeNull();
+  });
+
+  it("fills all paths even when all scores are below 60 (regression for production bug 2026-09-17)", () => {
+    const occs = [
+      fakeOcc({ id: "paramedic", title_he: "פרמדיק", constraints: { typical_training_months: 24, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "medium", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } }),
+      fakeOcc({ id: "plumber", title_he: "אינסטלטור", constraints: { typical_training_months: 18, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "high", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } }),
+      fakeOcc({ id: "hvac", title_he: "טכנאי מיזוג אוויר", constraints: { typical_training_months: 12, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "high", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } }),
+      fakeOcc({ id: "electrician", title_he: "חשמלאי", constraints: { typical_training_months: 24, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "medium", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } }),
+      fakeOcc({ id: "carpenter", title_he: "נגר", constraints: { typical_training_months: 18, typical_training_cost_nis: 0, requires_english_level: "none", remote_ok: false, typical_locations: [] }, market: { demand_he: "medium", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" } }),
+    ];
+    const rankings = [
+      rank("paramedic", 58, { interests: 55, constraints: 60 }),
+      rank("plumber", 56, { interests: 50, constraints: 58 }),
+      rank("hvac", 52, { interests: 48, constraints: 55 }),
+      rank("electrician", 49, { interests: 45, constraints: 50 }),
+      rank("carpenter", 41, { interests: 38, constraints: 42 }),
+    ];
+    const paths = pickPaths(rankings, occs);
+    
+    // All three paths should be filled with distinct occupations
+    expect(paths.safe).not.toBeNull();
+    expect(paths.growth).not.toBeNull();
+    expect(paths.wildcard).not.toBeNull();
+    
+    // All three should be distinct
+    const pathIds = [paths.safe, paths.growth, paths.wildcard];
+    const uniqueIds = new Set(pathIds);
+    expect(uniqueIds.size).toBe(3);
+    
+    // Should prefer hands-on trades (all these are trades, so just verify non-null)
+    expect(pathIds).toContain("paramedic");
+    expect(pathIds).toContain("plumber");
+    expect(pathIds).toContain("hvac");
   });
 });
