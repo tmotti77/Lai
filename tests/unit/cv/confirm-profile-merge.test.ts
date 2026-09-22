@@ -1,56 +1,55 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SkillSource } from "@/lib/cv/types";
-
-// Mock Supabase service client
-const mockServiceClient = {
-  from: vi.fn(),
-  rpc: vi.fn(),
-};
+import { chainQuery } from "@/tests/mocks/supabase-chain";
 
 vi.mock("@/lib/supabase/service", () => ({
-  createServiceClient: () => mockServiceClient,
+  createServiceClient: vi.fn(),
 }));
 
+import { createServiceClient } from "@/lib/supabase/service";
+
+const CV_SKILLS = [
+  { id: "data-analysis", name_he: "ניתוח נתונים", source: "cv" as SkillSource },
+];
+
 /**
- * Inline the key logic from mergeCvSkillsIntoLatestProfile for testing.
- * We test that CV skills are merged into the conversation-linked profile,
- * not just any profile.
+ * Wire a service-client mock for app/api/cv/confirm/route.ts.
+ *
+ * An earlier version of this file declared its own local mergeCvSkillsIntoLatestProfile
+ * that only built mock objects and returned them, so every assertion here ran against
+ * mocks nothing had called. These tests now import and run the real route function.
  */
-async function mergeCvSkillsIntoLatestProfile(
-  userId: string,
-  skills: Array<{ id: string; name_he: string; source: SkillSource; evidence?: string }>,
-) {
-  const svc = mockServiceClient;
+function wireClient(opts: {
+  conversations: Array<{ id: string }> | null;
+  profileResults: QueryResultList;
+}) {
+  const conversationsQuery = chainQuery([{ data: opts.conversations, error: null }]);
+  const profileQuery = chainQuery(opts.profileResults);
+  const updateEq = vi.fn(() => Promise.resolve({ error: null }));
+  const update = vi.fn(() => ({ eq: updateEq }));
+  const insertPayloads: Array<{ conversation_id: string | null }> = [];
+  const insert = vi.fn((payload: { conversation_id: string | null }) => {
+    insertPayloads.push(payload);
+    return Promise.resolve({ error: null });
+  });
+  Object.assign(profileQuery, { update, insert });
 
-  // First, try to find the profile linked to the user's latest conversation.
-  const conversationsQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue({ data: null }),
-  };
-  
-  const profileQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-  };
-
-  svc.from.mockImplementation((table: string) => {
-    if (table === "conversations") return conversationsQuery;
-    if (table === "career_profile") return profileQuery;
-    throw new Error(`Unexpected table: ${table}`);
+  (createServiceClient as ReturnType<typeof vi.fn>).mockReturnValue({
+    from: vi.fn((table: string) => {
+      if (table === "conversations") return conversationsQuery;
+      if (table === "career_profile") return profileQuery;
+      throw new Error(`Unexpected table: ${table}`);
+    }),
   });
 
-  // This function should:
-  // 1. Look up latest conversation for user
-  // 2. Look up profile for that conversation
-  // 3. Fall back to latest profile if no conversation profile exists
-  // 4. Insert if no profile exists
+  return { conversationsQuery, profileQuery, update, updateEq, insert, insertPayloads };
+}
 
-  return { svc, conversationsQuery, profileQuery };
+type QueryResultList = Parameters<typeof chainQuery>[0];
+
+async function runMerge(): Promise<void> {
+  const { mergeCvSkillsIntoLatestProfile } = await import("@/app/api/cv/confirm/route");
+  await mergeCvSkillsIntoLatestProfile("test-user-id", CV_SKILLS);
 }
 
 describe("CV confirm → profile merge flow", () => {
@@ -59,100 +58,62 @@ describe("CV confirm → profile merge flow", () => {
   });
 
   it("looks up the latest conversation for the user first", async () => {
-    const userId = "test-user-id";
-    const skills = [
-      { id: "data-analysis", name_he: "ניתוח נתונים", source: "cv" as SkillSource },
-    ];
+    const { conversationsQuery } = wireClient({
+      conversations: null,
+      profileResults: [{ data: null, error: null }],
+    });
 
-    const { conversationsQuery } = await mergeCvSkillsIntoLatestProfile(userId, skills);
+    await runMerge();
 
     expect(conversationsQuery.select).toHaveBeenCalledWith("id");
-    expect(conversationsQuery.eq).toHaveBeenCalledWith("user_id", userId);
+    expect(conversationsQuery.eq).toHaveBeenCalledWith("user_id", "test-user-id");
     expect(conversationsQuery.order).toHaveBeenCalledWith("updated_at", { ascending: false });
     expect(conversationsQuery.limit).toHaveBeenCalledWith(1);
   });
 
   it("queries for profile linked to latest conversation when one exists", async () => {
-    const userId = "test-user-id";
     const conversationId = "test-conv-id";
-    const skills = [
-      { id: "electrical", name_he: "חשמל", source: "cv" as SkillSource },
-    ];
-
-    // Mock: latest conversation exists
-    const conversationsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue({ data: [{ id: conversationId }] }),
-    };
-
-    const profileQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { id: "profile-id", data: {} },
-        error: null,
-      }),
-    };
-
-    mockServiceClient.from.mockImplementation((table: string) => {
-      if (table === "conversations") return conversationsQuery;
-      if (table === "career_profile") return profileQuery;
-      throw new Error(`Unexpected table: ${table}`);
+    const { profileQuery } = wireClient({
+      conversations: [{ id: conversationId }],
+      profileResults: [{ data: { id: "profile-id", data: {} }, error: null }],
     });
 
-    await mergeCvSkillsIntoLatestProfile(userId, skills);
+    await runMerge();
 
-    // Should query profile filtered by both user_id AND conversation_id
-    expect(profileQuery.eq).toHaveBeenCalledWith("user_id", userId);
+    expect(profileQuery.eq).toHaveBeenCalledWith("user_id", "test-user-id");
     expect(profileQuery.eq).toHaveBeenCalledWith("conversation_id", conversationId);
   });
 
   it("falls back to latest profile by updated_at if no conversation profile exists", async () => {
-    const userId = "test-user-id";
-    const conversationId = "test-conv-id";
-    const skills = [
-      { id: "plumbing", name_he: "אינסטלציה", source: "cv" as SkillSource },
-    ];
-
-    // Mock: conversation exists, but no profile linked to it
-    const conversationsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue({ data: [{ id: conversationId }] }),
-    };
-
-    let profileQueryCallCount = 0;
-    const profileQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockImplementation(async () => {
-        profileQueryCallCount++;
-        if (profileQueryCallCount === 1) {
-          // First call: no profile for conversation
-          return { data: null, error: null };
-        }
-        // Second call: fallback finds a profile
-        return { data: { id: "fallback-profile-id", data: {} }, error: null };
-      }),
-    };
-
-    mockServiceClient.from.mockImplementation((table: string) => {
-      if (table === "conversations") return conversationsQuery;
-      if (table === "career_profile") return profileQuery;
-      throw new Error(`Unexpected table: ${table}`);
+    const { profileQuery } = wireClient({
+      conversations: [{ id: "test-conv-id" }],
+      profileResults: [
+        { data: null, error: null },
+        { data: { id: "fallback-profile-id", data: {} }, error: null },
+      ],
     });
 
-    await mergeCvSkillsIntoLatestProfile(userId, skills);
+    await runMerge();
 
-    // Should query profile twice: once filtered by conversation_id, then by updated_at
+    // Once filtered by conversation_id, then again ordered by updated_at.
     expect(profileQuery.maybeSingle).toHaveBeenCalledTimes(2);
+    expect(profileQuery.order).toHaveBeenCalledWith("updated_at", { ascending: false });
+  });
+
+  it("inserts a new profile linked to the conversation when none exists", async () => {
+    const conversationId = "test-conv-id";
+    const { insert, insertPayloads } = wireClient({
+      conversations: [{ id: conversationId }],
+      profileResults: [
+        { data: null, error: null },
+        { data: null, error: null },
+      ],
+    });
+
+    await runMerge();
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insertPayloads[0].conversation_id).toBe(conversationId);
   });
 });
 
@@ -163,7 +124,6 @@ describe("profile data shape after CV confirm", () => {
       { id: "electrical", name_he: "חשמל", source: "cv" as SkillSource, evidence: "5 years" },
     ];
 
-    // Verify shape matches what buildMatchingProfile expects
     for (const skill of confirmedSkills) {
       expect(skill).toHaveProperty("id");
       expect(skill).toHaveProperty("name_he");
@@ -177,7 +137,6 @@ describe("profile data shape after CV confirm", () => {
       { label: "Programming", label_he: "תכנות", evidence: "test", confidence: "high" },
     ];
 
-    // Verify shape matches extraction schema
     for (const skill of chatSkills) {
       expect(skill).toHaveProperty("label_he");
       expect(skill).toHaveProperty("confidence");
