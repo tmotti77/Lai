@@ -19,7 +19,7 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
 
   // Safe path: high constraints fit + short training + high demand + reasonable overall match.
   // total_score ≥ 70 prevents occupations that only match on constraints (e.g., PM for a hands-on profile).
-  const safe = findRank((r, occ) =>
+  let safe = findRank((r, occ) =>
     (r.breakdown.constraints ?? 0) >= 70 &&
     occ.constraints.typical_training_months <= 12 &&
     (occ.market.demand_he === "high" || occ.market.demand_he === "very_high") &&
@@ -41,7 +41,21 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
   }
 
   // Wildcard path: next highest remaining score ≥60
-  const wildcard = findRank((r) => r.total_score >= 60);
+  let wildcard = findRank((r) => r.total_score >= 60);
+
+  // Final fallbacks: fill any remaining null slot with the best unused ranking, no score floor.
+  // `findRank` walks `rankings` in descending-score order and marks each pick used, so these
+  // three calls yield distinct occupations, best-first. An empty path card is worse for the
+  // user than a weak-but-honest one.
+  //
+  // Deliberately NOT title-based. An earlier revision preferred "hands-on trades" by regex
+  // matching occ.title_he, which silently demoted the two highest-scoring matches: for the
+  // 2026-09-17 production case it returned hvac(52)/electrician(49)/security-installer(48)
+  // and skipped paramedic(58) and plumber(56), whose Hebrew titles did not match. Ranking
+  // order is the source of truth.
+  if (safe === null) safe = findRank(() => true);
+  if (growth === null) growth = findRank(() => true);
+  if (wildcard === null) wildcard = findRank(() => true);
 
   return { safe, growth, wildcard };
 }
