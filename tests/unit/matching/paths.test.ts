@@ -3,15 +3,19 @@ import { pickPaths } from "@/lib/matching/paths";
 import type { Ranking, Occupation } from "@/lib/matching/types";
 
 const fakeOcc = (overrides: Partial<Occupation> & { id: string }): Occupation => ({
-  id: overrides.id, title_he: overrides.id, title_en: overrides.id, description_he: "x".repeat(40),
-  riasec_affinity: overrides.riasec_affinity ?? { R: 0.5, I: 0.5, A: 0.5, S: 0.5, E: 0.5, C: 0.5 },
+  title_he: overrides.id, title_en: overrides.id, description_he: "x".repeat(40),
+  riasec_affinity: { R: 0.5, I: 0.5, A: 0.5, S: 0.5, E: 0.5, C: 0.5 },
   required_skills: [], desired_skills: [], values_fit: [],
-  constraints: overrides.constraints ?? {
+  constraints: {
     typical_training_months: 6, typical_training_cost_nis: 0,
     requires_english_level: "none", remote_ok: false, typical_locations: [],
   },
-  market: overrides.market ?? { demand_he: "high", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" },
+  market: { demand_he: "high", typical_salary_nis_min: 0, typical_salary_nis_max: 0, ai_risk: "low" },
   data_source: "test", last_verified_at: "2026-01-01",
+  // Spread LAST so callers can override any field. Previously title_he was hard-wired to
+  // overrides.id, so a test passing a Hebrew title silently got the Latin id instead — which
+  // hid a title-regex bug in pickPaths from the entire suite.
+  ...overrides,
 });
 
 const rank = (id: string, total: number, breakdown: Partial<Ranking["breakdown"]>): Ranking => ({
@@ -103,5 +107,31 @@ describe("pickPaths", () => {
     expect(pathIds).toContain("paramedic");
     expect(pathIds).toContain("plumber");
     expect(pathIds).toContain("hvac");
+  });
+  it("fallback preserves ranking order and ignores job titles (regression: title regex demoted top matches)", () => {
+    // Real catalog titles from the 2026-09-17 production case. A title-regex fallback
+    // returned hvac(52)/electrician(49) and skipped paramedic(58)/plumber(56) because
+    // their Hebrew titles did not match the "hands-on trade" pattern. Ranking order wins.
+    const occs = [
+      fakeOcc({ id: "paramedic", title_he: "פאראמדיק/ית" }),
+      fakeOcc({ id: "plumber", title_he: "אינסטלטור/ית" }),
+      fakeOcc({ id: "hvac", title_he: "טכנאי/ת מיזוג אוויר" }),
+      fakeOcc({ id: "electrician", title_he: "חשמלאי/ת מוסמך/ת" }),
+    ];
+    const rankings = [
+      rank("paramedic", 58, { skills: 45, market: 85 }),
+      rank("plumber", 56, { skills: 41, market: 85 }),
+      rank("hvac", 52, { skills: 35, market: 85 }),
+      rank("electrician", 49, { skills: 31, market: 85 }),
+    ];
+    const paths = pickPaths(rankings, occs);
+    expect(paths.safe).toBe("paramedic");
+    expect(paths.growth).toBe("plumber");
+    expect(paths.wildcard).toBe("hvac");
+  });
+
+  it("fakeOcc honours a title_he override (guards the helper itself)", () => {
+    expect(fakeOcc({ id: "x", title_he: "פאראמדיק" }).title_he).toBe("פאראמדיק");
+    expect(fakeOcc({ id: "x" }).title_he).toBe("x");
   });
 });

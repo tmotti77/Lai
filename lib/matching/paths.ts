@@ -43,29 +43,19 @@ export function pickPaths(rankings: Ranking[], occupations: Occupation[]): Paths
   // Wildcard path: next highest remaining score ≥60
   let wildcard = findRank((r) => r.total_score >= 60);
 
-  // Final fallbacks: fill any remaining null slots with the best unused ranking, NO score floor.
-  // Prefer hands-on trades over generic sales/account-exec roles when scores are close.
-  const isHandsOnTrade = (occ: Occupation): boolean => {
-    const title = occ.title_he.toLowerCase();
-    return /חשמל|אינסטלציה|מיזוג|טכנאי|מכונאי|נגר|בנ[יי]ן/.test(title);
-  };
-
-  const isAccountExec = (occ: Occupation): boolean => {
-    const title = occ.title_he.toLowerCase();
-    return /account.*executive|מנהל חשבון|מכירות ארגוני/.test(title);
-  };
-
-  if (safe === null) {
-    safe = findRank((r, occ) => !isAccountExec(occ) && isHandsOnTrade(occ)) ?? findRank(() => true);
-  }
-
-  if (growth === null) {
-    growth = findRank((r, occ) => !isAccountExec(occ) && isHandsOnTrade(occ)) ?? findRank(() => true);
-  }
-
-  if (wildcard === null) {
-    wildcard = findRank((r, occ) => !isAccountExec(occ) && isHandsOnTrade(occ)) ?? findRank(() => true);
-  }
+  // Final fallbacks: fill any remaining null slot with the best unused ranking, no score floor.
+  // `findRank` walks `rankings` in descending-score order and marks each pick used, so these
+  // three calls yield distinct occupations, best-first. An empty path card is worse for the
+  // user than a weak-but-honest one.
+  //
+  // Deliberately NOT title-based. An earlier revision preferred "hands-on trades" by regex
+  // matching occ.title_he, which silently demoted the two highest-scoring matches: for the
+  // 2026-09-17 production case it returned hvac(52)/electrician(49)/security-installer(48)
+  // and skipped paramedic(58) and plumber(56), whose Hebrew titles did not match. Ranking
+  // order is the source of truth.
+  if (safe === null) safe = findRank(() => true);
+  if (growth === null) growth = findRank(() => true);
+  if (wildcard === null) wildcard = findRank(() => true);
 
   return { safe, growth, wildcard };
 }
