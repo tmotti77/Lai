@@ -4,6 +4,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { serverEnv } from "@/lib/env";
 import { ANON_COOKIE_NAME, ensureAnonymousCookie } from "@/lib/anonymous";
 
+/** GET /api/me/export and DELETE /api/me. */
+export function isDataRightsPath(pathname: string): boolean {
+  return pathname === "/api/me" || pathname.startsWith("/api/me/");
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -27,6 +32,10 @@ export async function updateSession(request: NextRequest) {
   );
 
   await supabase.auth.getUser();
+
+  // The data-rights routes resolve identity read-only (#51): minting an anonymous
+  // user here would make an export or delete create an account first.
+  if (isDataRightsPath(request.nextUrl.pathname)) return response;
 
   // Bootstrap anonymous cookie so server components never need to write one.
   // Next.js 16 forbids cookie writes from Server Components; we do it here in
