@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
+import { track } from "@/lib/analytics";
+import { buildUserExport } from "@/lib/privacy/export";
+import { dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
+import { claimExportSlot, EXPORT_COOLDOWN_SECONDS } from "@/lib/privacy/rateLimit";
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
+export const dynamic = "force-dynamic";
+
+// Deliberately no requireConsent (exception to the "every gated route" rule, #51).
+// Access is a data-subject right: a user who revoked consent, or never gave it, can
+// still see what we hold. This route never creates an identity either; see
+// resolveCurrentUserIds.
+export async function GET() {
+  if (!dataRightsEnabled()) {
+    return NextResponse.json({ error: "disabled" }, { status: 503 });
+  }
+
+  try {
+    const { authUser, ids } = await resolveRequestIdentity();
+    if (!ids) return NextResponse.json({ error: "no_identity" }, { status: 401 });
+
+    if (!(await claimExportSlot(ids.primaryId))) {
+      return NextResponse.json(
+        { error: "rate_limited", retry_after_s: EXPORT_COOLDOWN_SECONDS },
+        { status: 429, headers: { "retry-after": String(EXPORT_COOLDOWN_SECONDS) } },
+      );
+    }
+
+    const bundle = await buildUserExport(
+      ids,
+      authUser
+        ? {
+            email: authUser.email ?? null,
+            created_at: authUser.created_at ?? null,
+            last_sign_in_at: authUser.last_sign_in_at ?? null,
+          }
+        : null,
+    );
+    track("data_exported", { is_anonymous: ids.isAnonymous });
+
+    return new NextResponse(JSON.stringify(bundle, null, 2), {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": `attachment; filename="careeros-export-${bundle.exported_at.slice(0, 10)}.json"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (err) {
+    Sentry.captureException(err, { tags: { context: "data_export" } });
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}

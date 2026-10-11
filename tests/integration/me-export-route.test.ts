@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
 import type { FakeSupabase as FakeSupabaseT } from "../mocks/fake-supabase";
 
 type AuthUser = { id: string; email: string; created_at: string; last_sign_in_at: string };
@@ -37,10 +36,6 @@ import { makeFake, seedUser, type SeededUser } from "./helpers/privacy-seed";
 
 const NOW = new Date("2026-10-11T12:00:00.000Z");
 
-function exportRequest() {
-  return new NextRequest("http://localhost:3000/api/me/export", { method: "GET" });
-}
-
 function signIn(u: SeededUser) {
   h.authUser = { id: u.authId!, email: `${u.authId}@example.com`, created_at: "2026-01-01T00:00:00.000Z", last_sign_in_at: "2026-10-01T00:00:00.000Z" };
 }
@@ -68,7 +63,7 @@ afterEach(() => {
 describe("GET /api/me/export", () => {
   it("authed A gets exactly A's rows in every table, and nothing of B's", async () => {
     signIn(A);
-    const res = await GET(exportRequest());
+    const res = await GET();
     expect(res.status).toBe(200);
     const text = await res.text();
     const body = JSON.parse(text);
@@ -85,14 +80,14 @@ describe("GET /api/me/export", () => {
 
   it("paginates past PostgREST's 1000-row cap (all 1,500 messages)", async () => {
     signIn(A);
-    const body = await (await GET(exportRequest())).json();
+    const body = await (await GET()).json();
     expect(body.tables.messages).toHaveLength(1500);
     expect(new Set(body.tables.messages.map((m: { id: string }) => m.id)).size).toBe(1500);
   });
 
   it("includes both the conversation-linked and the orphan career_profile rows", async () => {
     signIn(A);
-    const body = await (await GET(exportRequest())).json();
+    const body = await (await GET()).json();
     const convIds = body.tables.career_profile.map((p: { conversation_id: string | null }) => p.conversation_id);
     expect(convIds).toContain(null);
     expect(convIds).toContain(A.rows.conversations[0].id);
@@ -100,7 +95,7 @@ describe("GET /api/me/export", () => {
 
   it("redacts anonymous_sessions.token but keeps the timestamps", async () => {
     signIn(A);
-    const text = await (await GET(exportRequest())).text();
+    const text = await (await GET()).text();
     const body = JSON.parse(text);
     expect(body.tables.anonymous_sessions[0]).toMatchObject({ token: "[redacted]", expires_at: expect.any(String) });
     expect(text).not.toContain(String(A.rows.anonymous_sessions[0].token));
@@ -108,7 +103,7 @@ describe("GET /api/me/export", () => {
 
   it("lists storage objects with signed URLs, including orphans, and flags missing ones", async () => {
     signIn(A);
-    const body = await (await GET(exportRequest())).json();
+    const body = await (await GET()).json();
     const byPath = Object.fromEntries(body.storage.map((s: { path: string }) => [s.path, s]));
     expect(Object.keys(byPath).sort()).toEqual([...A.objectPaths, A.missingObjectPath].sort());
     for (const p of A.objectPaths) {
@@ -124,7 +119,7 @@ describe("GET /api/me/export", () => {
 
   it("anonymous B exports via cookie and sees only B", async () => {
     h.cookies.set("co_anon", "tok-b");
-    const res = await GET(exportRequest());
+    const res = await GET();
     expect(res.status).toBe(200);
     const text = await res.text();
     const body = JSON.parse(text);
@@ -137,7 +132,7 @@ describe("GET /api/me/export", () => {
     const C = seedUser(h.fake, { anonToken: "tok-c" });
     signIn(A);
     h.cookies.set("co_anon", "tok-c");
-    const body = await (await GET(exportRequest())).json();
+    const body = await (await GET()).json();
     expect(body.account.user_id).toBe(A.userId);
     expect(body.linked_anonymous.user_id).toBe(C.userId);
     expect(body.linked_anonymous.tables.conversations).toHaveLength(1);
@@ -145,7 +140,7 @@ describe("GET /api/me/export", () => {
   });
 
   it("no identity → 401 and nothing is created", async () => {
-    const res = await GET(exportRequest());
+    const res = await GET();
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "no_identity" });
     expect(h.fake.writes).toEqual([]);
@@ -153,18 +148,18 @@ describe("GET /api/me/export", () => {
 
   it("rate limits to one export per 60 s per user", async () => {
     signIn(A);
-    expect((await GET(exportRequest())).status).toBe(200);
-    const limited = await GET(exportRequest());
+    expect((await GET()).status).toBe(200);
+    const limited = await GET();
     expect(limited.status).toBe(429);
     expect(limited.headers.get("retry-after")).toBe("60");
     expect(await limited.json()).toMatchObject({ error: "rate_limited" });
     vi.setSystemTime(new Date(NOW.getTime() + 61_000));
-    expect((await GET(exportRequest())).status).toBe(200);
+    expect((await GET()).status).toBe(200);
   });
 
   it("sets download, no-store and nosniff headers", async () => {
     signIn(A);
-    const res = await GET(exportRequest());
+    const res = await GET();
     expect(res.headers.get("content-type")).toMatch(/^application\/json/);
     expect(res.headers.get("content-disposition")).toBe('attachment; filename="careeros-export-2026-10-11.json"');
     expect(res.headers.get("cache-control")).toBe("no-store");
@@ -174,13 +169,13 @@ describe("GET /api/me/export", () => {
   it("does not require consent: a user who revoked consent can still export", async () => {
     for (const c of A.rows.consents) c.revoked_at = "2026-09-01T00:00:00.000Z";
     signIn(A);
-    expect((await GET(exportRequest())).status).toBe(200);
+    expect((await GET()).status).toBe(200);
     expect(h.requireConsent).not.toHaveBeenCalled();
   });
 
   it("returns 503 when the DATA_RIGHTS_ENABLED kill switch is off", async () => {
     process.env.DATA_RIGHTS_ENABLED = "false";
     signIn(A);
-    expect((await GET(exportRequest())).status).toBe(503);
+    expect((await GET()).status).toBe(503);
   });
 });
