@@ -250,3 +250,31 @@ describe("GET /api/me/export — storage errors", () => {
     expect(h.captureException).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /api/me/export — auth-only account", () => {
+  it("a signed-in user with no public rows gets their auth profile and empty tables, and nothing is created", async () => {
+    h.authUser = {
+      id: "auth-only",
+      email: "auth-only@example.com",
+      created_at: "2026-01-01T00:00:00.000Z",
+      last_sign_in_at: "2026-10-01T00:00:00.000Z",
+    };
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toBe('attachment; filename="careeros-export-2026-10-11.json"');
+    const body = await res.json();
+    expect(body.account).toEqual({
+      user_id: null,
+      is_anonymous: false,
+      auth: { email: "auth-only@example.com", created_at: "2026-01-01T00:00:00.000Z", last_sign_in_at: "2026-10-01T00:00:00.000Z" },
+    });
+    expect(Object.keys(body.tables).sort()).toEqual(Object.keys(USER_DATA_TABLES).sort());
+    for (const rows of Object.values(body.tables)) expect(rows).toEqual([]);
+    expect(body.storage).toEqual([]);
+    expect(body.linked_anonymous).toBeNull();
+
+    expect(h.fake.writes).toEqual([]);
+    expect(h.fake.rows("users").some((r) => r.auth_id === "auth-only")).toBe(false);
+    expect(h.fake.callsOf("storage.list")).toEqual([]);
+  });
+});
