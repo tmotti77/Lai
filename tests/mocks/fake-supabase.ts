@@ -38,6 +38,7 @@ export type DeleteScope =
 const PRIMARY_KEYS: Record<string, string> = { anonymous_sessions: "token" };
 
 function parseValue(raw: string): unknown {
+  if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
   if (raw === "null") return null;
   if (raw === "true") return true;
   if (raw === "false") return false;

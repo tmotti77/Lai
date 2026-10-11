@@ -12,7 +12,9 @@ export type EventName =
   | "plan_task_completed"
   | "interview_started"
   | "interview_completed"
-  | "feedback_submitted";
+  | "feedback_submitted"
+  | "data_exported"
+  | "account_deleted";
 
 export type SkillCountBucket = "0-5" | "6-10" | "11-20" | "20+";
 export type CvArchetype = "builder" | "connector" | "analyst" | "leader" | "creator" | "generalist";
@@ -40,6 +42,8 @@ export type EventPropsMap = {
   feedback_submitted:
     | { kind: "thumb"; surface: "chat" | "recommendations" | "interview"; value: "up" | "down" | "removed" }
     | { kind: "nps"; trigger: NpsTrigger; bucket: NpsBucket };
+  data_exported: { is_anonymous: boolean };
+  account_deleted: { is_anonymous: boolean; had_auth_user: boolean };
 };
 
 export function track<E extends EventName>(event: E, props: EventPropsMap[E]): void {
