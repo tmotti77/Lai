@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { track } from "@/lib/analytics";
-import { buildUserExport, ExportStorageError } from "@/lib/privacy/export";
+import { buildAuthOnlyExport, buildUserExport, ExportStorageError, type ExportBundle } from "@/lib/privacy/export";
 import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
 import { claimExportSlot, EXPORT_COOLDOWN_SECONDS } from "@/lib/privacy/rateLimit";
 
@@ -20,26 +20,31 @@ export async function GET() {
 
   try {
     const { authUser, ids } = await resolveRequestIdentity();
-    if (!ids) return NextResponse.json({ error: "no_identity" }, { status: 401 });
+    const auth = authUser
+      ? {
+          email: authUser.email ?? null,
+          created_at: authUser.created_at ?? null,
+          last_sign_in_at: authUser.last_sign_in_at ?? null,
+        }
+      : null;
 
-    if (!(await claimExportSlot(ids.primaryId))) {
-      return NextResponse.json(
-        { error: "rate_limited", retry_after_s: EXPORT_COOLDOWN_SECONDS },
-        { status: 429, headers: { "retry-after": String(EXPORT_COOLDOWN_SECONDS) } },
-      );
+    let bundle: ExportBundle;
+    if (ids) {
+      if (!(await claimExportSlot(ids.primaryId))) {
+        return NextResponse.json(
+          { error: "rate_limited", retry_after_s: EXPORT_COOLDOWN_SECONDS },
+          { status: 429, headers: { "retry-after": String(EXPORT_COOLDOWN_SECONDS) } },
+        );
+      }
+      bundle = await buildUserExport(ids, auth);
+    } else if (auth) {
+      // Signed in, but no public rows: export the auth profile without creating any. Not
+      // rate limited: there is no row to key the limit on, and this path reads no tables.
+      bundle = buildAuthOnlyExport(auth);
+    } else {
+      return NextResponse.json({ error: "no_identity" }, { status: 401 });
     }
-
-    const bundle = await buildUserExport(
-      ids,
-      authUser
-        ? {
-            email: authUser.email ?? null,
-            created_at: authUser.created_at ?? null,
-            last_sign_in_at: authUser.last_sign_in_at ?? null,
-          }
-        : null,
-    );
-    track("data_exported", { is_anonymous: ids.isAnonymous });
+    track("data_exported", { is_anonymous: ids?.isAnonymous ?? false });
 
     return new NextResponse(JSON.stringify(bundle, null, 2), {
       status: 200,

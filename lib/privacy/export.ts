@@ -61,7 +61,8 @@ export interface ExportBundle {
   exported_at: string;
   notice_he: string;
   notice_en: string;
-  account: { user_id: string; is_anonymous: boolean; auth: AuthProfile | null };
+  /** user_id is null for a signed-in account that has no public rows yet. */
+  account: { user_id: string | null; is_anonymous: boolean; auth: AuthProfile | null };
   tables: Record<UserDataTable, Row[]>;
   storage: ExportedObject[];
   linked_anonymous: UserDataSnapshot | null;
@@ -161,6 +162,23 @@ async function snapshot(svc: ServiceClient, userId: string): Promise<UserDataSna
   return { user_id: userId, tables, storage };
 }
 
+function bundle(
+  account: ExportBundle["account"],
+  primary: Pick<UserDataSnapshot, "tables" | "storage">,
+  linked: UserDataSnapshot | null,
+): ExportBundle {
+  return {
+    format_version: EXPORT_FORMAT_VERSION,
+    exported_at: new Date().toISOString(),
+    notice_he: he.settings.export.fileNotice,
+    notice_en: NOTICE_EN,
+    account,
+    tables: primary.tables,
+    storage: primary.storage,
+    linked_anonymous: linked,
+  };
+}
+
 /**
  * Everything we hold about the caller. Reads use the service role (RLS can't serve
  * anonymous users); isolation comes from every query being scoped by the caller's own
@@ -170,14 +188,14 @@ export async function buildUserExport(ids: CurrentUserIds, auth: AuthProfile | n
   const svc = createServiceClient();
   const primary = await snapshot(svc, ids.primaryId);
   const linked = ids.linkedAnonymousId ? await snapshot(svc, ids.linkedAnonymousId) : null;
-  return {
-    format_version: EXPORT_FORMAT_VERSION,
-    exported_at: new Date().toISOString(),
-    notice_he: he.settings.export.fileNotice,
-    notice_en: NOTICE_EN,
-    account: { user_id: ids.primaryId, is_anonymous: ids.isAnonymous, auth },
-    tables: primary.tables,
-    storage: primary.storage,
-    linked_anonymous: linked,
-  };
+  return bundle({ user_id: ids.primaryId, is_anonymous: ids.isAnonymous, auth }, primary, linked);
+}
+
+/**
+ * A signed-in account with no public.users row (it never used a gated feature): all we
+ * hold is the auth profile. Same shape as a full export, with every table empty.
+ */
+export function buildAuthOnlyExport(auth: AuthProfile): ExportBundle {
+  const tables = Object.fromEntries(USER_DATA_TABLE_NAMES.map((t): [UserDataTable, Row[]] => [t, []])) as Record<UserDataTable, Row[]>;
+  return bundle({ user_id: null, is_anonymous: false, auth }, { tables, storage: [] }, null);
 }
