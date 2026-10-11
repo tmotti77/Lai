@@ -225,3 +225,28 @@ describe("GET /api/me/export — auth service errors", () => {
     expect(h.fake.writes).toEqual([]);
   });
 });
+
+describe("GET /api/me/export — storage errors", () => {
+  it("a signed-URL failure other than not-found fails the export and is reported", async () => {
+    signIn(A);
+    h.fake.failNext("storage.createSignedUrl");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await GET();
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("storage_unavailable");
+    expect(body.tables).toBeUndefined();
+    expect(h.captureException).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tags: expect.objectContaining({ context: "data_export", stage: "storage" }) }),
+    );
+  });
+
+  it("only a confirmed not-found becomes available:false", async () => {
+    signIn(A);
+    const body = await (await GET()).json();
+    const unavailable = body.storage.filter((s: { available: boolean }) => !s.available);
+    expect(unavailable.map((s: { path: string }) => s.path)).toEqual([A.missingObjectPath]);
+    expect(h.captureException).not.toHaveBeenCalled();
+  });
+});
