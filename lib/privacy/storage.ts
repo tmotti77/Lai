@@ -51,3 +51,14 @@ export async function removeObjects(
   }
   return removed;
 }
+
+/**
+ * True only for a confirmed missing object. storage-js puts the body's statusCode (or
+ * code) on the error, falling back to the HTTP status; older Storage APIs answer a
+ * missing object with HTTP 400 and statusCode "404".
+ */
+export function isStorageNotFound(error: unknown): boolean {
+  if (error === null || typeof error !== "object") return false;
+  const { status, statusCode } = error as { status?: unknown; statusCode?: unknown };
+  return status === 404 || statusCode === "404" || statusCode === "NoSuchKey";
+}

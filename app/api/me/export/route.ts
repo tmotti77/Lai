@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { track } from "@/lib/analytics";
-import { buildUserExport } from "@/lib/privacy/export";
+import { buildUserExport, ExportStorageError } from "@/lib/privacy/export";
 import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
 import { claimExportSlot, EXPORT_COOLDOWN_SECONDS } from "@/lib/privacy/rateLimit";
 
@@ -54,6 +54,10 @@ export async function GET() {
     if (err instanceof AuthUnavailableError) {
       Sentry.captureException(err, { tags: { context: "data_export", stage: "identity" } });
       return NextResponse.json({ error: "auth_unavailable" }, { status: 503 });
+    }
+    if (err instanceof ExportStorageError) {
+      Sentry.captureException(err, { tags: { context: "data_export", stage: "storage" } });
+      return NextResponse.json({ error: "storage_unavailable" }, { status: 500 });
     }
     Sentry.captureException(err, { tags: { context: "data_export" } });
     return NextResponse.json({ error: "internal" }, { status: 500 });

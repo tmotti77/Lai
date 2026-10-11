@@ -9,7 +9,7 @@ import {
   type TableSpec,
   type UserDataTable,
 } from "@/lib/privacy/registry";
-import { listUserObjects } from "@/lib/privacy/storage";
+import { isStorageNotFound, listUserObjects } from "@/lib/privacy/storage";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 type Row = Record<string, unknown>;
@@ -25,6 +25,14 @@ const NOTICE_EN =
   "This file contains all the data CareerOS holds about you: account, consents, conversations, " +
   "questionnaires, career profile, recommendations, plans, CVs, interview practice and feedback. " +
   "CV download links expire 15 minutes after export. The anonymous session token is redacted for security.";
+
+/** Storage failed for a reason other than a missing object; the export can't be complete. */
+export class ExportStorageError extends Error {
+  constructor(cause: unknown) {
+    super("export: storage unavailable", { cause });
+    this.name = "ExportStorageError";
+  }
+}
 
 export interface ExportedObject {
   bucket: StorageBucket;
@@ -137,8 +145,11 @@ async function readStorage(svc: ServiceClient, userId: string, cvRows: Row[]): P
     const { data, error } = await svc.storage
       .from(o.bucket)
       .createSignedUrl(o.path, SIGNED_URL_TTL_SECONDS, { download });
-    // A missing object (already deleted, or swept by the 30-day lifecycle) is reported, not fatal.
+    // A missing object (already deleted, or swept by the 30-day lifecycle) is reported, not
+    // fatal. Any other failure would silently drop a CV from the export, so it fails it.
+    if (error && !isStorageNotFound(error)) throw new ExportStorageError(error);
     const signed = !error && data?.signedUrl ? data.signedUrl : null;
+    if (!error && !signed) throw new ExportStorageError(new Error("createSignedUrl returned no URL"));
     out.push({ ...o, signed_url: signed, expires_at: signed ? expiresAt : null, available: signed !== null });
   }
   return out;
