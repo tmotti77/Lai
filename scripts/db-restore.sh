@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Restore an encrypted career-os backup into TARGET_DB_URL. See docs/runbooks/db-backup.md.
 # Usage: TARGET_DB_URL=... BACKUP_PASSPHRASE=... scripts/db-restore.sh <file.dump.gpg>
-# RESTORE_CLEAN=1 adds --clean --if-exists. Refuses the career-os prod project unless I_KNOW_THIS_IS_PROD=1.
+# RESTORE_CLEAN=1 adds --clean --if-exists. RESTORE_ALLOW_ERRORS=1 finishes (with a warning)
+# even if pg_restore reports errors. Refuses the career-os prod project unless I_KNOW_THIS_IS_PROD=1.
 set -euo pipefail
 umask 077
 
@@ -38,5 +39,15 @@ gpg --batch --yes --decrypt --pinentry-mode loopback --passphrase-fd 3 \
 # Restore ACLs too; without them PUBLIC regains EXECUTE on SECURITY DEFINER RPCs.
 ARGS=(--no-owner --dbname="$TARGET_DB_URL")
 [ "${RESTORE_CLEAN:-}" = "1" ] && ARGS+=(--clean --if-exists)
-pg_restore "${ARGS[@]}" "$PLAIN"
+# pg_restore exits non-zero even for ignorable errors (e.g. missing Supabase roles on plain Postgres),
+# so capture the status instead of letting set -e abort silently.
+status=0
+pg_restore "${ARGS[@]}" "$PLAIN" || status=$?
+if [ "$status" -ne 0 ]; then
+  if [ "${RESTORE_ALLOW_ERRORS:-}" = "1" ]; then
+    echo "db-restore: warning: pg_restore exited with status $status; continuing because RESTORE_ALLOW_ERRORS=1. Review the errors above." >&2
+  else
+    die "pg_restore exited with status $status. Review the errors above; if they are expected (e.g. missing Supabase roles on plain Postgres), re-run with RESTORE_ALLOW_ERRORS=1."
+  fi
+fi
 echo "db-restore: done" >&2

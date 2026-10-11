@@ -22,9 +22,14 @@ jobs:
         env:
           HAS_URL: ${{ secrets.SUPABASE_DB_URL != '' }}
           HAS_PASS: ${{ secrets.BACKUP_PASSPHRASE != '' }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ "$HAS_URL" = "true" ] && [ "$HAS_PASS" = "true" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            # A silent green skip on the weekly run would hide that no backups are being taken.
+            echo "::error::SUPABASE_DB_URL and/or BACKUP_PASSPHRASE not set. Scheduled DB backup cannot run. See docs/runbooks/db-backup.md."
+            exit 1
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::warning::SUPABASE_DB_URL and/or BACKUP_PASSPHRASE not set. Skipping DB backup. See docs/runbooks/db-backup.md."
@@ -32,6 +37,8 @@ jobs:
 
       - uses: actions/checkout@v4
         if: steps.check.outputs.configured == 'true'
+        with:
+          persist-credentials: false
 
       - name: Install postgresql-client-17 (PGDG)
         if: steps.check.outputs.configured == 'true'

@@ -16,7 +16,9 @@ Set them in GitHub → Settings → Secrets and variables → Actions:
 | `SUPABASE_DB_URL` | The **session pooler** connection string (Supabase → Connect → Session pooler, port 5432), with the DB password filled in. Don't use the direct host, because it's IPv6-only and Actions runners have no IPv6. Don't use the transaction pooler (6543), because it breaks `pg_dump`. |
 | `BACKUP_PASSPHRASE` | A long random passphrase, e.g. `openssl rand -base64 32`. **Store it in the password manager.** If it's lost, every backup is unrecoverable. |
 
-If either secret is missing, the workflow logs a warning and skips. It stays green.
+If either secret is missing, the **scheduled** run fails (red), so a misconfiguration can't silently stop backups. A manual run (workflow_dispatch) logs a warning and skips instead.
+
+**The passphrase is the only protection for the artifact.** The dump contains `auth` data, including password hashes and refresh tokens, and anyone who can download the artifact can brute-force a weak passphrase offline. Use a generated passphrase (≥ 32 random bytes), never a memorable one, and rotate it (new secret + note which backups use which passphrase) if it may have leaked.
 
 ## Schedule and storage
 - `.github/workflows/db-backup.yml` runs **Sundays 02:00 UTC** and on demand (Actions → DB Backup → Run workflow).
@@ -26,10 +28,12 @@ If either secret is missing, the workflow logs a warning and skips. It stays gre
 ## Run locally
 Needs `pg_dump`/`pg_restore` with **major version ≥ the server's** (17), plus `gpg`.
 ```bash
-export SUPABASE_DB_URL='<session pooler string>'   # from your shell/password manager, not a file in the repo
+export SUPABASE_DB_URL='<session pooler string, without the password>'   # from your shell/password manager, not a file in the repo
+read -rs PGPASSWORD && export PGPASSWORD   # prompts; keeps the DB password out of the URL and shell history
 export BACKUP_PASSPHRASE='<passphrase>'
 scripts/db-backup.sh ./backups      # ./backups is gitignored; prints the output path
 ```
+Locally, prefer `PGPASSWORD` (or `~/.pgpass`) over a password embedded in the URL: `pg_dump` receives the URL as a command-line argument, which other local users can see in the process list, and it ends up in shell history. In GitHub Actions the URL comes from a secret and is masked, so the embedded password is acceptable there.
 
 ## Restore / test-restore
 Test-restore into a **throwaway local Postgres 17**, never into career-os:
@@ -41,6 +45,7 @@ scripts/db-restore.sh ./backups/careeros-db-<ts>.dump.gpg
 psql "$TARGET_DB_URL" -c 'select count(*) from public.users;'
 ```
 - On a plain Postgres, roles that Supabase creates (`authenticated`, `anon`, `service_role`) and extensions will produce some expected errors. Table data still restores.
+- Because of those errors, `pg_restore` exits non-zero and the script **fails by default** with `pg_restore exited with status N`. Read the errors; if they are only the expected role/extension ones, re-run with `RESTORE_ALLOW_ERRORS=1`, which finishes with a warning instead. Never use it to paper over errors on a Supabase target.
 - `RESTORE_CLEAN=1` adds `--clean --if-exists`.
 
 ### Post-restore check: SECURITY DEFINER privileges
