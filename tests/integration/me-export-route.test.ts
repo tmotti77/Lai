@@ -193,6 +193,8 @@ describe("GET /api/me/export — auth service errors", () => {
     ["a retryable fetch error", () => new AuthRetryableFetchError("fetch failed", 0)],
     ["an auth 5xx", () => new AuthApiError("upstream down", 503, "unexpected_failure")],
     ["an auth 429", () => new AuthApiError("slow down", 429, "over_request_rate_limit")],
+    ["a rejected API key (our config, not the caller)", () => new AuthApiError("Invalid API key", 401, undefined)],
+    ["an auth 404 with no code", () => new AuthApiError("Not Found", 404, undefined)],
     ["an unknown auth error", () => new AuthUnknownError("bad json", new Error("x"))],
     ["a thrown error", () => new TypeError("network down")],
   ])("%s → 503, nothing exported, no slot claimed", async (_label, makeError) => {
@@ -218,10 +220,12 @@ describe("GET /api/me/export — auth service errors", () => {
     expect((await res.json()).account).toMatchObject({ user_id: B.userId, is_anonymous: true, auth: null });
   });
 
-  it("a rejected credential (auth 403) and no cookie → 401", async () => {
+  it("a rejected session (bad_jwt) → 401 session_expired, even with a live co_anon", async () => {
     h.authError = new AuthApiError("invalid JWT", 403, "bad_jwt");
+    h.cookies.set("co_anon", "tok-b");
     const res = await GET();
     expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "session_expired" });
     expect(h.fake.writes).toEqual([]);
   });
 });
@@ -240,6 +244,13 @@ describe("GET /api/me/export — storage errors", () => {
       expect.anything(),
       expect.objectContaining({ tags: expect.objectContaining({ context: "data_export", stage: "storage" }) }),
     );
+  });
+
+  it("a failed export doesn't use up the cooldown: an immediate retry is served", async () => {
+    signIn(A);
+    h.fake.failNext("storage.createSignedUrl");
+    expect((await GET()).status).toBe(500);
+    expect((await GET()).status).toBe(200);
   });
 
   it("only a confirmed not-found becomes available:false", async () => {

@@ -196,7 +196,7 @@ describe("DELETE /api/me — happy paths", () => {
     expect(await again.json()).toEqual({
       deleted: true,
       complete: true,
-      report: { tables: zeroCounts(), storage_objects: 0, storage_cleanup: "complete", auth_user: "absent" },
+      report: { tables: zeroCounts(), storage_objects: 0, storage_cleanup: "not_checked", auth_user: "absent" },
     });
   });
 
@@ -208,7 +208,7 @@ describe("DELETE /api/me — happy paths", () => {
     expect((await again.json()).report).toEqual({
       tables: zeroCounts(),
       storage_objects: 0,
-      storage_cleanup: "complete",
+      storage_cleanup: "not_checked",
       auth_user: "n/a",
     });
   });
@@ -330,10 +330,12 @@ describe("DELETE /api/me — partial failures and retries", () => {
     expect(errorLog).toHaveBeenCalled();
     errorLog.mockRestore();
 
-    // The client retry converges: nothing left behind the session, 200 with zero counts.
+    // The client retry converges (200, zero counts) but can no longer see the folder, so
+    // it says it did not check storage rather than claiming it is clean.
     const retry = await DELETE(deleteRequest());
     expect(retry.status).toBe(200);
-    expect((await retry.json()).complete).toBe(true);
+    expect((await retry.json()).report.storage_cleanup).toBe("not_checked");
+    expect(h.fake.objectPaths(BUCKET)).toContain(late);
   });
 });
 
@@ -380,6 +382,8 @@ describe("DELETE /api/me — auth service errors", () => {
     ["a retryable fetch error", () => new AuthRetryableFetchError("fetch failed", 0)],
     ["an auth 5xx", () => new AuthApiError("upstream down", 503, "unexpected_failure")],
     ["an auth 429", () => new AuthApiError("slow down", 429, "over_request_rate_limit")],
+    ["a rejected API key (our config, not the caller)", () => new AuthApiError("Invalid API key", 401, undefined)],
+    ["an auth 404 with no code", () => new AuthApiError("Not Found", 404, undefined)],
     ["an unknown auth error", () => new AuthUnknownError("bad json", new Error("x"))],
     ["a thrown error", () => new TypeError("network down")],
   ])("%s → 503 and nothing is deleted, even with an anon cookie", async (_label, makeError) => {
@@ -408,6 +412,28 @@ describe("DELETE /api/me — auth service errors", () => {
     expect((await res.json()).report.auth_user).toBe("n/a");
     expect(ownedCounts(h.fake, B.userId)).toEqual(zeroCounts());
     expect(ownedCounts(h.fake, A.userId).users).toBe(1);
+  });
+
+  it.each(["bad_jwt", "session_expired", "session_not_found", "refresh_token_not_found"])(
+    "a rejected session (%s) with a live co_anon → 401 session_expired, nothing deleted",
+    async (code) => {
+      h.authError = new AuthApiError("rejected", 403, code);
+      h.cookies.set("co_anon", "tok-b");
+      const res = await DELETE(deleteRequest());
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "session_expired" });
+      expect(ownedCounts(h.fake, B.userId)).toEqual(bBefore);
+      expect(h.fake.callsOf("storage.remove")).toEqual([]);
+    },
+  );
+
+  it("an auth user that no longer exists (user_not_found) counts as a credential: replay → 200", async () => {
+    signIn(A);
+    await DELETE(deleteRequest());
+    h.authError = new AuthApiError("User from sub claim in JWT does not exist", 403, "user_not_found");
+    const again = await DELETE(deleteRequest());
+    expect(again.status).toBe(200);
+    expect((await again.json()).report.auth_user).toBe("n/a");
   });
 
   it("no session and no cookie → 401", async () => {
