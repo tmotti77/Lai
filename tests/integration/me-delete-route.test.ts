@@ -343,9 +343,19 @@ describe("DELETE /api/me — lock", () => {
     h.fake.rows("users").find((r) => r.id === A.userId)!.deletion_requested_at = new Date(NOW.getTime() - 30_000).toISOString();
     const res = await DELETE(deleteRequest());
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "deletion_in_progress" });
+    // The lock was taken 30 s ago and expires after 120 s.
+    expect(res.headers.get("retry-after")).toBe("90");
+    expect(await res.json()).toEqual({ error: "deletion_in_progress", retry_after_s: 90 });
     expect(ownedCounts(h.fake, A.userId).messages).toBe(3);
     expect(h.fake.callsOf("storage.remove")).toEqual([]);
+  });
+
+  it("Retry-After is at least 1 s, even for a lock about to expire", async () => {
+    signIn(A);
+    h.fake.rows("users").find((r) => r.id === A.userId)!.deletion_requested_at = new Date(NOW.getTime() - 119_500).toISOString();
+    const res = await DELETE(deleteRequest());
+    expect(res.status).toBe(409);
+    expect(res.headers.get("retry-after")).toBe("1");
   });
 
   it("a stale lock older than 2 minutes is claimable", async () => {
@@ -357,8 +367,10 @@ describe("DELETE /api/me — lock", () => {
 
   it("two concurrent requests → one 200, one 409", async () => {
     signIn(A);
-    const statuses = (await Promise.all([DELETE(deleteRequest()), DELETE(deleteRequest())])).map((r) => r.status);
-    expect(statuses.sort()).toEqual([200, 409]);
+    const responses = await Promise.all([DELETE(deleteRequest()), DELETE(deleteRequest())]);
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+    const conflict = responses.find((r) => r.status === 409)!;
+    expect(conflict.headers.get("retry-after")).toBe("120");
     expectAGone();
   });
 });
