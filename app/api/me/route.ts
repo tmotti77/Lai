@@ -9,7 +9,7 @@ import {
   DeletionStageError,
   deleteUserData,
 } from "@/lib/privacy/delete";
-import { dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
+import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -44,6 +44,10 @@ export async function DELETE(req: NextRequest) {
     identity = await resolveRequestIdentity();
   } catch (err) {
     Sentry.captureException(err, { tags: { context: "account_delete", stage: "identity" } });
+    // Never fall back to the cookie identity here: we'd delete less than the caller's account.
+    if (err instanceof AuthUnavailableError) {
+      return NextResponse.json({ error: "auth_unavailable", retryable: true }, { status: 503 });
+    }
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
   const { supabase, authUser, ids, hasAnonCookie } = identity;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { track } from "@/lib/analytics";
 import { buildUserExport } from "@/lib/privacy/export";
-import { dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
+import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
 import { claimExportSlot, EXPORT_COOLDOWN_SECONDS } from "@/lib/privacy/rateLimit";
 
 export const runtime = "nodejs";
@@ -51,6 +51,10 @@ export async function GET() {
       },
     });
   } catch (err) {
+    if (err instanceof AuthUnavailableError) {
+      Sentry.captureException(err, { tags: { context: "data_export", stage: "identity" } });
+      return NextResponse.json({ error: "auth_unavailable" }, { status: 503 });
+    }
     Sentry.captureException(err, { tags: { context: "data_export" } });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
