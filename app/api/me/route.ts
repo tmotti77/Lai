@@ -82,7 +82,10 @@ export async function DELETE(req: NextRequest) {
     return res;
   } catch (err) {
     if (err instanceof DeletionInProgressError) {
-      return NextResponse.json({ error: "deletion_in_progress" }, { status: 409 });
+      return NextResponse.json(
+        { error: "deletion_in_progress", retry_after_s: err.retryAfterSeconds },
+        { status: 409, headers: { "retry-after": String(err.retryAfterSeconds) } },
+      );
     }
     if (err instanceof DeletionStageError) {
       const res = NextResponse.json(

@@ -25,7 +25,7 @@ export class DeletionStageError extends Error {
 }
 
 export class DeletionInProgressError extends Error {
-  constructor() {
+  constructor(public retryAfterSeconds: number) {
     super("account deletion already in progress");
     this.name = "DeletionInProgressError";
   }
@@ -45,6 +45,10 @@ export interface DeleteReport {
   /** "incomplete": rows and account are gone, but objects may remain under the user's folder. */
   storage_cleanup: "complete" | "incomplete";
   auth_user: "deleted" | "absent" | "n/a";
+}
+
+async function releaseLocks(userIds: readonly string[]): Promise<void> {
+  await Promise.all(userIds.map(releaseDeletionLock));
 }
 
 function fail(stage: DeletionStage, err: unknown, userId: string | null): DeletionStageError {
@@ -142,29 +146,29 @@ export async function deleteUserData(target: DeleteTarget): Promise<DeleteReport
     try {
       lock = await claimDeletionLock(id);
     } catch (err) {
-      await Promise.all(claimed.map(releaseDeletionLock));
+      await releaseLocks(claimed);
       throw fail("lock", err, id);
     }
-    if (lock === "held") {
-      await Promise.all(claimed.map(releaseDeletionLock));
-      throw new DeletionInProgressError();
+    if (lock.state === "held") {
+      await releaseLocks(claimed);
+      throw new DeletionInProgressError(lock.retryAfterSeconds);
     }
     // "gone": the rows were deleted by an earlier attempt; only the auth stage may remain.
-    if (lock === "claimed") claimed.push(id);
+    if (lock.state === "claimed") claimed.push(id);
   }
 
   for (const id of claimed) {
     try {
       report.storage_objects += await deleteStorage(svc, id);
     } catch (err) {
-      await Promise.all(claimed.map(releaseDeletionLock));
+      await releaseLocks(claimed);
       throw fail("storage", err, id);
     }
     let counts: Record<string, number>;
     try {
       counts = await deleteRows(svc, id);
     } catch (err) {
-      await Promise.all(claimed.map(releaseDeletionLock));
+      await releaseLocks(claimed);
       throw fail("db", err, id);
     }
     for (const t of USER_DATA_TABLE_NAMES) report.tables[t] += Number(counts[t] ?? 0);

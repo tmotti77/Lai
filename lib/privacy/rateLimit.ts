@@ -28,7 +28,11 @@ export async function claimExportSlot(userId: string): Promise<boolean> {
   return data !== null;
 }
 
-export type DeletionLock = "claimed" | "held" | "gone";
+export type DeletionLock =
+  | { state: "claimed" }
+  | { state: "gone" }
+  /** retryAfterSeconds: until the lock expires, at least 1. */
+  | { state: "held"; retryAfterSeconds: number };
 
 export async function claimDeletionLock(userId: string): Promise<DeletionLock> {
   const svc = createServiceClient();
@@ -40,11 +44,18 @@ export async function claimDeletionLock(userId: string): Promise<DeletionLock> {
     .select("id")
     .maybeSingle();
   if (error) throw new Error(`claimDeletionLock: ${error.message}`);
-  if (data) return "claimed";
+  if (data) return { state: "claimed" };
 
-  const { data: exists, error: readErr } = await svc.from("users").select("id").eq("id", userId).maybeSingle();
+  const { data: row, error: readErr } = await svc
+    .from("users")
+    .select("deletion_requested_at")
+    .eq("id", userId)
+    .maybeSingle();
   if (readErr) throw new Error(`claimDeletionLock: ${readErr.message}`);
-  return exists ? "held" : "gone";
+  if (!row) return { state: "gone" };
+  const heldFor = row.deletion_requested_at ? Date.now() - Date.parse(row.deletion_requested_at) : 0;
+  const retryAfterSeconds = Math.max(1, Math.ceil(DELETION_LOCK_TTL_SECONDS - heldFor / 1000));
+  return { state: "held", retryAfterSeconds };
 }
 
 /**
