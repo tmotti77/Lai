@@ -28,6 +28,12 @@ export async function claimExportSlot(userId: string): Promise<boolean> {
   return data !== null;
 }
 
+/** Gives the slot back after a failed export, so the user can retry without a 429. */
+export async function releaseExportSlot(userId: string): Promise<void> {
+  const svc = createServiceClient();
+  await svc.from("users").update({ last_export_at: null }).eq("id", userId);
+}
+
 export type DeletionLock =
   | { state: "claimed" }
   | { state: "gone" }

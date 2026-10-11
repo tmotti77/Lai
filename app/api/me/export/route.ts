@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { track } from "@/lib/analytics";
 import { buildAuthOnlyExport, buildUserExport, ExportStorageError, type ExportBundle } from "@/lib/privacy/export";
-import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
-import { claimExportSlot, EXPORT_COOLDOWN_SECONDS } from "@/lib/privacy/rateLimit";
+import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity, SessionRejectedError } from "@/lib/privacy/identity";
+import { claimExportSlot, EXPORT_COOLDOWN_SECONDS, releaseExportSlot } from "@/lib/privacy/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -36,7 +36,12 @@ export async function GET() {
           { status: 429, headers: { "retry-after": String(EXPORT_COOLDOWN_SECONDS) } },
         );
       }
-      bundle = await buildUserExport(ids, auth);
+      try {
+        bundle = await buildUserExport(ids, auth);
+      } catch (err) {
+        await releaseExportSlot(ids.primaryId);
+        throw err;
+      }
     } else if (auth) {
       // Signed in, but no public rows: export the auth profile without creating any. Not
       // rate limited: there is no row to key the limit on, and this path reads no tables.
@@ -56,6 +61,9 @@ export async function GET() {
       },
     });
   } catch (err) {
+    if (err instanceof SessionRejectedError) {
+      return NextResponse.json({ error: "session_expired" }, { status: 401 });
+    }
     if (err instanceof AuthUnavailableError) {
       Sentry.captureException(err, { tags: { context: "data_export", stage: "identity" } });
       return NextResponse.json({ error: "auth_unavailable" }, { status: 503 });

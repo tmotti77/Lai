@@ -74,8 +74,8 @@ export async function POST(req: Request) {
       return Response.json({ error: "deletion_in_progress" }, { status: 409 });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return Response.json({ error: "db_failed", message }, { status: 500 });
+    Sentry.captureException(err, { tags: { context: "cv_upload", stage: "deletion_lock" } });
+    return Response.json({ error: "db_failed" }, { status: 500 });
   }
 
   const svc = createServiceClient();

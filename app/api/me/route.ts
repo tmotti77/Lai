@@ -9,7 +9,7 @@ import {
   DeletionStageError,
   deleteUserData,
 } from "@/lib/privacy/delete";
-import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity } from "@/lib/privacy/identity";
+import { AuthUnavailableError, dataRightsEnabled, resolveRequestIdentity, SessionRejectedError } from "@/lib/privacy/identity";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -43,6 +43,9 @@ export async function DELETE(req: NextRequest) {
   try {
     identity = await resolveRequestIdentity();
   } catch (err) {
+    if (err instanceof SessionRejectedError) {
+      return NextResponse.json({ error: "session_expired" }, { status: 401 });
+    }
     Sentry.captureException(err, { tags: { context: "account_delete", stage: "identity" } });
     // Never fall back to the cookie identity here: we'd delete less than the caller's account.
     if (err instanceof AuthUnavailableError) {
@@ -50,11 +53,11 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
-  const { supabase, authUser, ids, hasAnonCookie } = identity;
+  const { supabase, authUser, ids, hasAnonCookie, authAccountGone } = identity;
 
   // A credential with nothing left behind it is a replay or a retry: succeed with zero
   // counts. Only a request with no credential at all is unauthenticated.
-  if (!ids && !authUser && !hasAnonCookie) {
+  if (!ids && !authUser && !hasAnonCookie && !authAccountGone) {
     return NextResponse.json({ error: "no_identity" }, { status: 401 });
   }
 
@@ -71,8 +74,9 @@ export async function DELETE(req: NextRequest) {
 
     // complete=false: the account and rows are gone but some storage objects may remain.
     // A retry can't reach them any more (nothing resolves to this user), so this is not a
-    // retryable 5xx; it is logged to Sentry for manual cleanup, with the bucket lifecycle as backstop.
-    const res = NextResponse.json({ deleted: true, complete: report.storage_cleanup === "complete", report });
+    // retryable 5xx; it is logged to Sentry for manual cleanup, with the bucket lifecycle as
+    // backstop. A retry reports storage_cleanup "not_checked", never a fresh "complete".
+    const res = NextResponse.json({ deleted: true, complete: report.storage_cleanup !== "incomplete", report });
     res.cookies.delete(ANON_COOKIE_NAME);
     if (authUser) {
       // The auth user is gone; drop the browser's now-dangling session cookies too.

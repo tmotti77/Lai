@@ -42,8 +42,11 @@ export interface DeleteTarget {
 export interface DeleteReport {
   tables: Record<UserDataTable, number>;
   storage_objects: number;
-  /** "incomplete": rows and account are gone, but objects may remain under the user's folder. */
-  storage_cleanup: "complete" | "incomplete";
+  /**
+   * "incomplete": rows and account are gone, but objects may remain under the user's folder.
+   * "not_checked": no account rows were left to resolve a folder from (a retry or replay).
+   */
+  storage_cleanup: "complete" | "incomplete" | "not_checked";
   auth_user: "deleted" | "absent" | "n/a";
 }
 
@@ -157,6 +160,7 @@ export async function deleteUserData(target: DeleteTarget): Promise<DeleteReport
     if (lock.state === "claimed") claimed.push(id);
   }
 
+  if (claimed.length === 0) report.storage_cleanup = "not_checked";
   for (const id of claimed) {
     try {
       report.storage_objects += await deleteStorage(svc, id);
