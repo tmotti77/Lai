@@ -5,7 +5,6 @@
  * Called by Claude Code before any tool use.
  */
 
-const PROTECTED_BRANCH = 'main';
 const SECRET_FILE_PATTERNS = [
   '.env',
   '.env.local',

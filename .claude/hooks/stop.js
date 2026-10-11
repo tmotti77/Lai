@@ -5,8 +5,10 @@
  * Called by Claude Code on session stop (user ends session or timeout).
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { execSync } = require('child_process');
 const fs = require('fs');
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 function run(cmd, description) {
   console.log(`\n🔍 ${description}...`);
@@ -14,7 +16,7 @@ function run(cmd, description) {
     execSync(cmd, { stdio: 'inherit', encoding: 'utf-8' });
     console.log(`✅ ${description} passed`);
     return true;
-  } catch (err) {
+  } catch {
     console.error(`❌ ${description} failed`);
     return false;
   }
