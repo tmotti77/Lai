@@ -48,3 +48,6 @@ scripts/test-cv.pdf
 # Playwright smoke-test artifacts (ephemeral)
 interview-landing.png
 /screenshots/
+
+# local DB backups (encrypted dumps)
+/backups/
