@@ -10,7 +10,7 @@ The closed beta runs on the **free** Supabase project `career-os` (`wqswamtcppjm
 
 - `set -euo pipefail`, `umask 077`. Secrets come only from env and are never echoed.
 - Fails fast with a clear message if `SUPABASE_DB_URL` or `BACKUP_PASSPHRASE` is missing, or if `pg_dump`/`pg_restore`/`gpg` aren't on `PATH`. All of these checks run before any connection attempt.
-- `pg_dump --format=custom --no-owner --no-privileges --schema=public --schema=auth --schema=storage` writes to a plaintext file in a private `mktemp -d` dir. An `EXIT` trap deletes that dir, so the plaintext never outlives the script, even on failure.
+- `pg_dump --format=custom --no-owner --schema=public --schema=auth --schema=storage` writes to a plaintext file in a private `mktemp -d` dir. An `EXIT` trap deletes that dir, so the plaintext never outlives the script, even on failure.
 - Sanity check: `pg_restore --list` on the plaintext archive. This catches truncated or corrupt dumps before we encrypt them.
 - `gpg --batch --symmetric --cipher-algo AES256 --no-symkey-cache --pinentry-mode loopback --passphrase-fd 3`. The passphrase goes in on fd 3 through a here-string, so it never appears in argv or `ps`.
 - Output: `<output_dir>/careeros-db-<UTC timestamp>.dump.gpg`. The default output dir is `./backups`, which is gitignored. The script prints the output path as the last line of stdout.
@@ -19,7 +19,8 @@ The closed beta runs on the **free** Supabase project `career-os` (`wqswamtcppjm
 
 - Requires `TARGET_DB_URL` and `BACKUP_PASSPHRASE`.
 - **Prod guard** (runs before decrypt or connect): the script refuses if `TARGET_DB_URL` contains the `career-os` project ref (case-insensitive) unless `I_KNOW_THIS_IS_PROD=1`. The ref covers both the direct host (`db.<ref>.supabase.co`) and the pooler user (`postgres.<ref>`). It also refuses if `TARGET_DB_URL` equals `SUPABASE_DB_URL`. The guard is meant to stop accidents. It is not a security boundary.
-- Decrypts to a private temp file, which the trap removes. Then runs `pg_restore --no-owner --no-privileges --dbname "$TARGET_DB_URL"`. `RESTORE_CLEAN=1` adds `--clean --if-exists`.
+- Decrypts to a private temp file, which the trap removes. Then runs `pg_restore --no-owner --dbname "$TARGET_DB_URL"`. `RESTORE_CLEAN=1` adds `--clean --if-exists`.
+- **Privileges are kept** on both sides (no `--no-privileges`). `20260517100000_revoke_rpc_execute.sql` revokes EXECUTE on the SECURITY DEFINER RPCs (`merge_career_profile`, `increment_conversation_counters`) from `public`/`anon`/`authenticated`. Without ACLs in the dump, the restored functions fall back to Postgres's default PUBLIC EXECUTE and become callable with the publishable key. Supabase targets have the same `anon`/`authenticated`/`service_role` roles, so the GRANT/REVOKE statements apply cleanly. `--no-owner` stays because the restoring role differs from the original owner.
 
 ### `.github/workflows/db-backup.yml`
 
@@ -38,7 +39,7 @@ The scripts run through `child_process.spawnSync("bash", ...)` with `PATH=<stub 
 
 1. Backup exits non-zero with a message naming `SUPABASE_DB_URL` when it's unset, and the same for `BACKUP_PASSPHRASE`. In both cases `pg_dump` is never invoked.
 2. Restore exits non-zero naming `TARGET_DB_URL` / `BACKUP_PASSPHRASE` when unset.
-3. Backup happy path (stubs): exit 0. Writes exactly one `careeros-db-*.dump.gpg`. `pg_dump` gets `--format=custom --no-owner --no-privileges` and the three schemas. `gpg` gets `--symmetric --cipher-algo AES256`. The passphrase is absent from every stub's argv and from stdout/stderr. No plaintext dump is left behind.
+3. Backup happy path (stubs): exit 0. Writes exactly one `careeros-db-*.dump.gpg`. `pg_dump` gets `--format=custom --no-owner` and the three schemas, and neither `pg_dump` nor `pg_restore` gets `--no-privileges`/`--no-acl`/`-x`. `gpg` gets `--symmetric --cipher-algo AES256`. The passphrase is absent from every stub's argv and from stdout/stderr. No plaintext dump is left behind.
 4. Restore guard: a URL with the prod ref (direct host and pooler-user forms, any case) exits non-zero with "Refusing", and `gpg` and `pg_restore` are never invoked. `I_KNOW_THIS_IS_PROD=1` lets it proceed. A non-prod URL proceeds. `TARGET_DB_URL == SUPABASE_DB_URL` is refused.
 5. Static checks: the scripts and workflow contain no `postgres(ql)://` URLs, `password=`, JWTs (`eyJ…`), `sb_secret_`/`sbp_` tokens or inline `PGPASSWORD=`.
 6. Workflow: it has a `schedule` cron and `workflow_dispatch`, top-level `permissions` is exactly `{contents: read}`, it installs `postgresql-client-17`, `retention-days: 90`, and the secrets reach the run step only via `secrets.*`.
@@ -51,6 +52,7 @@ There's no YAML parser in the dependency tree, so the workflow assertions use ta
 - **PGDG apt source conflict** if a future runner image already configures PGDG under another filename with a different `Signed-By`. In that case `apt-get update` fails loudly and we adjust.
 - **The dump includes `auth`**: emails, password hashes, refresh tokens. This is PII and credentials, hence AES256 encryption. If `BACKUP_PASSPHRASE` is lost, every backup is unrecoverable. The runbook says to keep it in the password manager.
 - **Storage file objects are not included**, only `storage.*` metadata rows. CVs live in the `cv-uploads` bucket. The runbook documents the manual download.
+- **ACL restore on a plain Postgres**: GRANT/REVOKE statements naming Supabase roles fail there (expected errors, see the runbook). On a Supabase target they apply. The runbook has a post-restore SQL check that `anon`/`authenticated` lack EXECUTE on the SECURITY DEFINER functions.
 - **Restoring `auth`/`storage` into another Supabase project** collides with the schemas that project already manages. The documented test-restore target is a throwaway local Postgres 17, and the runbook explains the expected errors.
 - The connection string is in `pg_dump`'s argv. On an ephemeral single-tenant runner this is acceptable, and Actions masks secrets in logs.
 - Artifact retention is capped by the repo/org setting. If that setting is < 90 days, GitHub silently applies the lower value.

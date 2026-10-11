@@ -22,7 +22,8 @@ PLAIN="$WORK/careeros-db-$TS.dump"
 OUT="$OUT_DIR/careeros-db-$TS.dump.gpg"
 
 echo "db-backup: dumping (public, auth, storage)..." >&2
-pg_dump --format=custom --no-owner --no-privileges \
+# Keep ACLs: the REVOKE EXECUTE on SECURITY DEFINER RPCs must survive a restore.
+pg_dump --format=custom --no-owner \
   --schema=public --schema=auth --schema=storage \
   --file="$PLAIN" --dbname="$SUPABASE_DB_URL"
 

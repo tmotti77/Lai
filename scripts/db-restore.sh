@@ -35,7 +35,8 @@ PLAIN="$WORK/restore.dump"
 gpg --batch --yes --decrypt --pinentry-mode loopback --passphrase-fd 3 \
   --output "$PLAIN" "$FILE" 3<<<"$BACKUP_PASSPHRASE"
 
-ARGS=(--no-owner --no-privileges --dbname="$TARGET_DB_URL")
+# Restore ACLs too; without them PUBLIC regains EXECUTE on SECURITY DEFINER RPCs.
+ARGS=(--no-owner --dbname="$TARGET_DB_URL")
 [ "${RESTORE_CLEAN:-}" = "1" ] && ARGS+=(--clean --if-exists)
 pg_restore "${ARGS[@]}" "$PLAIN"
 echo "db-restore: done" >&2

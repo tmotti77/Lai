@@ -4,7 +4,8 @@ The closed beta runs on the **free** Supabase project `career-os` (`wqswamtcppjm
 
 ## What gets backed up
 - Schemas `public`, `auth` (users, identities, password hashes, refresh tokens) and `storage` (**metadata rows only**).
-- Custom-format `pg_dump` with `--no-owner --no-privileges`, encrypted with GPG symmetric AES256.
+- Custom-format `pg_dump` with `--no-owner`, encrypted with GPG symmetric AES256.
+- **Privileges (GRANT/REVOKE) are preserved** in the dump and on restore. This keeps the REVOKE EXECUTE on SECURITY DEFINER RPCs from `20260517100000_revoke_rpc_execute.sql`; dropping ACLs would let `anon`/`authenticated` call them again.
 - **Not included:** the files in Storage buckets, e.g. CVs in `cv-uploads`. See "Storage files" below.
 
 ## Secrets (never commit them)
@@ -41,6 +42,19 @@ psql "$TARGET_DB_URL" -c 'select count(*) from public.users;'
 ```
 - On a plain Postgres, roles that Supabase creates (`authenticated`, `anon`, `service_role`) and extensions will produce some expected errors. Table data still restores.
 - `RESTORE_CLEAN=1` adds `--clean --if-exists`.
+
+### Post-restore check: SECURITY DEFINER privileges
+After every restore (especially into a Supabase project), verify that `anon` and `authenticated` cannot execute any SECURITY DEFINER function in `public`. `has_function_privilege` also counts grants to `PUBLIC`. This must return **zero rows**:
+```sql
+select p.oid::regprocedure as function, r.rolname as grantee
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+join pg_roles r on r.rolname in ('anon', 'authenticated')
+where n.nspname = 'public'
+  and p.prosecdef
+  and has_function_privilege(r.oid, p.oid, 'EXECUTE');
+```
+If it returns rows, re-apply the revokes from `supabase/migrations/20260517100000_revoke_rpc_execute.sql` before exposing the database to clients.
 - The script **refuses** any target that contains the career-os project ref, or that equals `SUPABASE_DB_URL`, unless `I_KNOW_THIS_IS_PROD=1`. Restoring into production is a disaster-recovery action and needs Moti's go-ahead. Prefer restoring only the affected tables (`pg_restore --list` / `--use-list`).
 
 Do a test-restore after the first scheduled run, and then quarterly.
