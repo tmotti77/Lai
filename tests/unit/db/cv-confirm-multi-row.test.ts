@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { chainQuery } from "@/tests/mocks/supabase-chain";
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: vi.fn(),
@@ -12,47 +13,31 @@ function mockClient(opts: {
   rows: Array<{ id: string; data: unknown; updated_at: string; conversation_id?: string | null }>;
   conversations?: Array<{ id: string }>;
 }) {
+  // chainQuery returns itself from every filter method, so the route is free to chain
+  // .eq().eq() or .eq().order().limit(). The previous hand-rolled mock returned a fresh
+  // literal per step and hard-coded one call sequence, so adding .eq("conversation_id", …)
+  // to the route broke it with ".eq(...).eq is not a function".
+  const conversationsQuery = chainQuery([
+    { data: opts.conversations ?? null, error: null },
+  ]);
+  const profileQuery = chainQuery([{ data: opts.rows[0] ?? null, error: null }]);
+
+  Object.assign(profileQuery, {
+    update: (values: unknown) => ({
+      eq: (col: string, val: string) => {
+        if (col === "id") {
+          capturedUpdate = { table: "career_profile", values, whereId: val };
+        }
+        return Promise.resolve({ error: null });
+      },
+    }),
+    insert: () => Promise.resolve({ error: null }),
+  });
+
   return {
     from: (table: string) => {
-      if (table === "conversations") {
-        return {
-          select: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () =>
-                  Promise.resolve({
-                    data: opts.conversations ?? null,
-                    error: null,
-                  }),
-              }),
-            }),
-          }),
-        };
-      }
-
-      if (table === "career_profile") {
-        return {
-          select: () => ({
-            eq: (col: string, val?: string | null) => ({
-              order: () => ({
-                limit: () => ({
-                  maybeSingle: () =>
-                    Promise.resolve({ data: opts.rows[0] ?? null, error: null }),
-                }),
-              }),
-            }),
-          }),
-          update: (values: unknown) => ({
-            eq: (col: string, val: string) => {
-              if (col === "id") {
-                capturedUpdate = { table, values, whereId: val };
-              }
-              return Promise.resolve({ error: null });
-            },
-          }),
-        };
-      }
-
+      if (table === "conversations") return conversationsQuery;
+      if (table === "career_profile") return profileQuery;
       throw new Error(`Unexpected table: ${table}`);
     },
   };
