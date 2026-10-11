@@ -409,6 +409,8 @@ export const he = {
       extractionFailed: "ניתוח הכישורים נכשל. נסה שוב.",
       saveFailed: "שמירת הכישורים נכשלה. נסה שוב.",
       noFile: "לא נבחר קובץ.",
+      // API returns "deletion_in_progress" while the account is being deleted (#51)
+      deletion_in_progress: "החשבון שלך נמצא בתהליך מחיקה, ולכן אי אפשר להעלות קבצים כרגע.",
     },
   },
   feedback: {

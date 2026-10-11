@@ -69,7 +69,10 @@ export async function DELETE(req: NextRequest) {
       had_auth_user: report.auth_user === "deleted",
     });
 
-    const res = NextResponse.json({ deleted: true, report });
+    // complete=false: the account and rows are gone but some storage objects may remain.
+    // A retry can't reach them any more (nothing resolves to this user), so this is not a
+    // retryable 5xx; it is logged to Sentry for manual cleanup, with the bucket lifecycle as backstop.
+    const res = NextResponse.json({ deleted: true, complete: report.storage_cleanup === "complete", report });
     res.cookies.delete(ANON_COOKIE_NAME);
     if (authUser) {
       // The auth user is gone; drop the browser's now-dangling session cookies too.

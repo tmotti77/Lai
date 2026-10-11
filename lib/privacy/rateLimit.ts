@@ -47,6 +47,22 @@ export async function claimDeletionLock(userId: string): Promise<DeletionLock> {
   return exists ? "held" : "gone";
 }
 
+/**
+ * True while a deletion holds this user's lock. Writers that create data outside the
+ * delete_user_data transaction (CV objects in Storage) check it first.
+ */
+export async function isDeletionInProgress(userId: string): Promise<boolean> {
+  const svc = createServiceClient();
+  const { data, error } = await svc
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .gt("deletion_requested_at", new Date(Date.now() - DELETION_LOCK_TTL_SECONDS * 1000).toISOString())
+    .maybeSingle();
+  if (error) throw new Error(`isDeletionInProgress: ${error.message}`);
+  return data !== null;
+}
+
 /** Lets the user retry immediately after a handled failure, instead of waiting out the TTL. */
 export async function releaseDeletionLock(userId: string): Promise<void> {
   const svc = createServiceClient();

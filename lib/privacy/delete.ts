@@ -42,6 +42,8 @@ export interface DeleteTarget {
 export interface DeleteReport {
   tables: Record<UserDataTable, number>;
   storage_objects: number;
+  /** "incomplete": rows and account are gone, but objects may remain under the user's folder. */
+  storage_cleanup: "complete" | "incomplete";
   auth_user: "deleted" | "absent" | "n/a";
 }
 
@@ -67,24 +69,37 @@ async function deleteStorage(svc: ServiceClient, userId: string): Promise<number
   return removed;
 }
 
-async function sweepStorage(svc: ServiceClient, userId: string): Promise<number> {
-  // Catches a CV uploaded between stage 1 and stage 2. Best effort: the 30-day bucket
-  // lifecycle rule is the backstop, so a failure here doesn't fail the deletion.
-  try {
-    const late = await listUserObjects(svc, userId);
-    let removed = 0;
-    for (const bucket of new Set(late.map((o) => o.bucket))) {
-      removed += await removeObjects(svc, bucket, late.filter((o) => o.bucket === bucket).map((o) => o.path));
+const SWEEP_ATTEMPTS = 3;
+
+/**
+ * Catches a CV uploaded between stage 1 and stage 2. The upload route refuses new uploads
+ * while the lock is held and removes its object when the row insert fails, so this is the
+ * last line, not the only one. By now the user's rows are gone, so a client retry could no
+ * longer find this folder: retry here instead, and on persistent failure report it (Sentry
+ * error with the user id for manual cleanup) rather than claim a complete deletion.
+ */
+async function sweepStorage(svc: ServiceClient, userId: string): Promise<{ removed: number; complete: boolean }> {
+  let removed = 0;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < SWEEP_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 250 * 2 ** (attempt - 1)));
+    try {
+      const late = await listUserObjects(svc, userId);
+      for (const bucket of new Set(late.map((o) => o.bucket))) {
+        removed += await removeObjects(svc, bucket, late.filter((o) => o.bucket === bucket).map((o) => o.path));
+      }
+      return { removed, complete: true };
+    } catch (err) {
+      lastErr = err;
     }
-    return removed;
-  } catch (err) {
-    Sentry.captureException(err, {
-      level: "warning",
-      tags: { context: "account_delete", stage: "storage_sweep" },
-      extra: { userId },
-    });
-    return 0;
   }
+  Sentry.captureException(lastErr, {
+    level: "error",
+    tags: { context: "account_delete", stage: "storage_sweep" },
+    extra: { userId },
+  });
+  console.error("[privacy] delete: storage cleanup incomplete", { userId });
+  return { removed, complete: false };
 }
 
 async function deleteRows(svc: ServiceClient, userId: string): Promise<Record<string, number>> {
@@ -105,7 +120,7 @@ async function deleteAuthUser(svc: ServiceClient, authId: string): Promise<"dele
  *   0. lock     guarded UPDATE on users.deletion_requested_at (409 if held)
  *   1. storage  objects under the user's folder ∪ cv_uploads paths; abort before the DB on failure
  *   2. db       delete_user_data RPC, one transaction (rolls back on failure)
- *   2b. sweep   re-list and remove late uploads; best effort
+ *   2b. sweep   re-list and remove late uploads; retried, then reported as storage_cleanup "incomplete"
  * then 3. auth: auth.admin.deleteUser, last so the caller keeps a working session to retry with.
  *
  * Every stage is idempotent, so a retry restarts from stage 0 and converges.
@@ -115,6 +130,7 @@ export async function deleteUserData(target: DeleteTarget): Promise<DeleteReport
   const report: DeleteReport = {
     tables: Object.fromEntries(USER_DATA_TABLE_NAMES.map((t) => [t, 0])) as Record<UserDataTable, number>,
     storage_objects: 0,
+    storage_cleanup: "complete",
     auth_user: "n/a",
   };
   const userIds = [...new Set([target.primaryId, target.linkedAnonymousId].filter((id): id is string => id !== null))];
@@ -152,7 +168,9 @@ export async function deleteUserData(target: DeleteTarget): Promise<DeleteReport
       throw fail("db", err, id);
     }
     for (const t of USER_DATA_TABLE_NAMES) report.tables[t] += Number(counts[t] ?? 0);
-    report.storage_objects += await sweepStorage(svc, id);
+    const sweep = await sweepStorage(svc, id);
+    report.storage_objects += sweep.removed;
+    if (!sweep.complete) report.storage_cleanup = "incomplete";
   }
 
   if (target.authId) {
@@ -163,6 +181,10 @@ export async function deleteUserData(target: DeleteTarget): Promise<DeleteReport
     }
   }
 
-  console.info("[privacy] delete", { tables: report.tables, storage_objects: report.storage_objects });
+  console.info("[privacy] delete", {
+    tables: report.tables,
+    storage_objects: report.storage_objects,
+    storage_cleanup: report.storage_cleanup,
+  });
   return report;
 }

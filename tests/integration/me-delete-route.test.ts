@@ -322,8 +322,8 @@ describe("DELETE /api/me — partial failures and retries", () => {
     expect(body).toMatchObject({ deleted: true, complete: false });
     expect(body.report.storage_cleanup).toBe("incomplete");
     expect(body.report.auth_user).toBe("deleted");
-    expectAGone();
-    expect(h.fake.objectPaths(BUCKET)).toContain(late);
+    expect(ownedCounts(h.fake, A.userId)).toEqual(zeroCounts());
+    expect(h.fake.objectPaths(BUCKET).filter((p) => p.startsWith(`${A.userId}/`))).toEqual([late]);
 
     expect(stagesCaptured()).toEqual(["storage_sweep"]);
     expect(h.captureException.mock.calls[0][1]).toMatchObject({ level: "error", extra: { userId: A.userId } });
