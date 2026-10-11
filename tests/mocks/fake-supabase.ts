@@ -19,6 +19,7 @@ type Result = { data: unknown; error: FakeError | null };
 
 export type FaultOp =
   | "storage.list"
+  | "storage.upload"
   | "storage.remove"
   | "storage.createSignedUrl"
   | "rpc:delete_user_data"
@@ -212,6 +213,17 @@ export class FakeSupabase {
           .sort((a, b) => compare(a.name, b.name));
         const offset = opts.offset ?? 0;
         return { data: names.slice(offset, offset + (opts.limit ?? 100)), error: null };
+      },
+      upload: async (path: string, body: unknown, opts: { contentType?: string; upsert?: boolean } = {}) => {
+        this.calls.push({ op: "storage.upload", args: [bucket, path, opts] });
+        const fault = this.consumeFault("storage.upload");
+        if (fault) return { data: null, error: fault };
+        if (store().has(path) && !opts.upsert) {
+          return { data: null, error: { message: "The resource already exists", statusCode: "409" } };
+        }
+        const size = body instanceof Uint8Array ? body.byteLength : 0;
+        store().set(path, { size });
+        return { data: { path }, error: null };
       },
       remove: async (paths: string[]) => {
         this.calls.push({ op: "storage.remove", args: [bucket, paths] });

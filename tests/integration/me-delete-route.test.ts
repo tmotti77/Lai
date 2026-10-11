@@ -152,7 +152,8 @@ describe("DELETE /api/me — happy paths", () => {
     const expectedCounts = Object.fromEntries(TABLES.map((t) => [t, A.rows[t].length]));
     expect(body).toEqual({
       deleted: true,
-      report: { tables: expectedCounts, storage_objects: 2, auth_user: "deleted" },
+      complete: true,
+      report: { tables: expectedCounts, storage_objects: 2, storage_cleanup: "complete", auth_user: "deleted" },
     });
     expect(res.headers.get("set-cookie")).toMatch(/co_anon=;/);
     expect(h.signOut).toHaveBeenCalledWith({ scope: "local" });
@@ -194,7 +195,8 @@ describe("DELETE /api/me — happy paths", () => {
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual({
       deleted: true,
-      report: { tables: zeroCounts(), storage_objects: 0, auth_user: "absent" },
+      complete: true,
+      report: { tables: zeroCounts(), storage_objects: 0, storage_cleanup: "complete", auth_user: "absent" },
     });
   });
 
@@ -203,7 +205,12 @@ describe("DELETE /api/me — happy paths", () => {
     await DELETE(deleteRequest());
     const again = await DELETE(deleteRequest());
     expect(again.status).toBe(200);
-    expect((await again.json()).report).toEqual({ tables: zeroCounts(), storage_objects: 0, auth_user: "n/a" });
+    expect((await again.json()).report).toEqual({
+      tables: zeroCounts(),
+      storage_objects: 0,
+      storage_cleanup: "complete",
+      auth_user: "n/a",
+    });
   });
 
   it("signing in again afterwards gives a fresh, empty account", async () => {
@@ -284,14 +291,49 @@ describe("DELETE /api/me — partial failures and retries", () => {
     expect((await res.json()).report.storage_objects).toBe(3);
   });
 
-  it("a sweep failure still returns 200, with a Sentry warning", async () => {
+  it("a transient sweep failure is retried in-request and the late CV is removed", async () => {
     signIn(A);
-    h.fake.hooks.beforeRpc = () => h.fake.putObject(BUCKET, `${A.userId}/late.pdf`);
-    h.fake.failNext("storage.remove", 1);
+    const late = `${A.userId}/late.pdf`;
+    h.fake.hooks.beforeRpc = () => h.fake.putObject(BUCKET, late);
+    h.fake.failNext("storage.remove", 1); // stage 1 succeeds, the first sweep attempt fails
     const res = await DELETE(deleteRequest());
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.complete).toBe(true);
+    expect(body.report.storage_cleanup).toBe("complete");
+    expect(h.fake.objectPaths(BUCKET)).not.toContain(late);
+    expect(h.captureException).not.toHaveBeenCalled();
+  });
+
+  it("a persistent sweep failure is not reported as full success", async () => {
+    signIn(A);
+    const late = `${A.userId}/late.pdf`;
+    h.fake.hooks.beforeRpc = () => h.fake.putObject(BUCKET, late);
+    h.fake.failNext("storage.remove", 1);
+    h.fake.failNext("storage.remove");
+    h.fake.failNext("storage.remove");
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await DELETE(deleteRequest());
+
+    // Rows and the auth user are gone; a retry has nothing left to resolve, so the
+    // honest answer is "deleted, but storage cleanup is incomplete", not a retryable 5xx.
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ deleted: true, complete: false });
+    expect(body.report.storage_cleanup).toBe("incomplete");
+    expect(body.report.auth_user).toBe("deleted");
+    expectAGone();
+    expect(h.fake.objectPaths(BUCKET)).toContain(late);
+
     expect(stagesCaptured()).toEqual(["storage_sweep"]);
-    expect(h.captureException.mock.calls[0][1]).toMatchObject({ level: "warning" });
+    expect(h.captureException.mock.calls[0][1]).toMatchObject({ level: "error", extra: { userId: A.userId } });
+    expect(errorLog).toHaveBeenCalled();
+    errorLog.mockRestore();
+
+    // The client retry converges: nothing left behind the session, 200 with zero counts.
+    const retry = await DELETE(deleteRequest());
+    expect(retry.status).toBe(200);
+    expect((await retry.json()).complete).toBe(true);
   });
 });
 
