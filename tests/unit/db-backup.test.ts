@@ -31,7 +31,7 @@ function run(script: string, env: Record<string, string>, args: string[] = []) {
   const s = stubs();
   const out = mkdtempSync(join(tmpdir(), "dbout-"));
   const r = spawnSync("bash", [script, ...args.map((a) => a.replace("$OUT", out))], {
-    env: { PATH: `${s.dir}:/usr/bin:/bin`, HOME: tmpdir(), ...env },
+    env: { PATH: `${s.dir}:/usr/bin:/bin`, HOME: tmpdir(), ...env } as unknown as NodeJS.ProcessEnv,
     encoding: "utf8",
   });
   const calls = existsSync(s.log) ? readFileSync(s.log, "utf8") : "";
