@@ -127,7 +127,7 @@ When reviewing code (as Codex or another agent), check these items:
 
 ### Review Process (for Codex or Claude Code)
 
-When reviewing PRs (GitHub Codex automatic review or `claude-review.yml`):
+When reviewing PRs (OpenAI Codex via `@codex review` or Claude Code via `claude-review.yml`):
 
 1. **Read the plan** (`docs/plans/<issue>.md`) to understand intent
 2. **Check plan critique** (should be committed before implementation)
@@ -138,7 +138,7 @@ When reviewing PRs (GitHub Codex automatic review or `claude-review.yml`):
 7. **Request changes** if Critical items failed
 8. **Approve** only if Critical passed and Important justified
 
-**Note**: GitHub Codex (ChatGPT) uses these rules automatically when enabled in repo settings. Claude Code uses them when invoked via `.github/workflows/claude-review.yml`.
+**Note**: OpenAI Codex reads these rules automatically when triggered via `@codex review` comment (configured at chatgpt.com/codex). Claude Code uses them when invoked via `.github/workflows/claude-review.yml`.
 
 ## NEVER Do
 

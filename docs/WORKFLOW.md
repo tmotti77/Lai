@@ -291,14 +291,17 @@ Plus:
 
 ## Branch Protection (Manual Setup)
 
-Moti must configure via GitHub Settings → Branches → `main`:
+Moti must configure via GitHub Settings → Branches → Add branch ruleset for `main`:
 
-- ✅ **Require PR** before merging
-- ✅ **Require status checks** to pass: `test` (CI)
-- ✅ **Dismiss stale approvals** when new commits pushed
-- ✅ **Require conversation resolution** before merge
-- ✅ **Block force push**
+- ✅ **Require a pull request before merging**
+  - **Require approvals**: 0 (solo owner, no peer reviewers)
+- ✅ **Require status checks to pass**
+  - Add required check: `test` (from ci.yml)
+- ✅ **Require conversation resolution before merging**
+- ✅ **Block force pushes**
 - ✅ **Require linear history** (squash or rebase, no merge commits)
+
+**Note**: Solo-owner setup means no human approvals required, but CI checks and resolved conversations are still mandatory.
 
 ---
 
@@ -320,14 +323,21 @@ Then add to GitHub Settings → Secrets and variables → Actions:
 
 **Workflow skips gracefully** when token missing, so CI stays green until configured.
 
-### 2. Codex Automatic Code Review
+### 2. OpenAI Codex Code Review
 
-Enable via GitHub repo Settings → Code security and analysis → ChatGPT Codex:
-- ✅ Enable Codex automatic code review
-- **Review rules**: Codex will read `AGENTS.md § Code Review Rules` automatically
-- Posts inline comments on PRs (no workflow file needed)
+Enable via ChatGPT Codex settings:
+1. Go to **[chatgpt.com/codex](https://chatgpt.com/codex)**
+2. Click **Settings → Code review**
+3. Connect GitHub account and authorize repository access
+4. Add `tmotti77/Lai` to enabled repositories
+5. **Review rules**: Codex will read `AGENTS.md § Code Review Rules` from the repo
 
-**Free with GitHub Copilot subscription** (included in Copilot Individual/Business/Enterprise).
+To trigger a review, comment on any PR:
+```
+@codex review
+```
+
+Codex will post inline comments and a summary review.
 
 ---
 
