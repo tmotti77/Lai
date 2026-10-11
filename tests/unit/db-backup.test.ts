@@ -61,8 +61,9 @@ describe("db-backup.sh", () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/^careeros-db-.*\.dump\.gpg$/);
     expect(r.calls).toMatch(/pg_dump .*--format=custom/);
-    expect(r.calls).toMatch(/--no-owner/);
-    expect(r.calls).toMatch(/--no-privileges/);
+    expect(r.calls).toMatch(/pg_dump .*--no-owner/);
+    // ACLs must survive the dump: the REVOKE EXECUTE on SECURITY DEFINER RPCs lives there.
+    expect(r.calls).not.toMatch(/--no-privileges|--no-acl|(^| )-x( |$)/m);
     for (const s of ["public", "auth", "storage"]) expect(r.calls).toMatch(new RegExp(`--schema=${s}`));
     expect(r.calls).toMatch(/gpg .*--symmetric/);
     expect(r.calls).toMatch(/--cipher-algo AES256/);
@@ -119,6 +120,8 @@ describe("db-restore.sh", () => {
     const r = run(RESTORE, { TARGET_DB_URL: STUB_URL, BACKUP_PASSPHRASE: PASS }, [dump()]);
     expect(r.status).toBe(0);
     expect(r.calls).toMatch(/pg_restore .*--no-owner/);
+    // Restoring without ACLs would re-open PUBLIC EXECUTE on SECURITY DEFINER RPCs.
+    expect(r.calls).not.toMatch(/--no-privileges|--no-acl|(^| )-x( |$)/m);
     expect(r.stderr + r.stdout + r.calls).not.toContain(PASS);
   });
 });
