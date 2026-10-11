@@ -1,0 +1,53 @@
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip if secret not configured (allows green CI before secret setup)
+    if: vars.SKIP_CLAUDE_REVIEW != 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff context
+
+      - name: Check if CLAUDE_CODE_OAUTH_TOKEN is configured
+        id: check-secret
+        run: |
+          if [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "⚠️ CLAUDE_CODE_OAUTH_TOKEN not configured. Skipping Claude review."
+            echo "To enable: Run 'claude setup-token' then add token to GitHub Settings → Secrets → Actions"
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Claude Code Review
+        if: steps.check-secret.outputs.configured == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          model: claude-sonnet-4.0
+          context-files: |
+            CLAUDE.md
+            AGENTS.md
+            docs/WORKFLOW.md
+          instructions: |
+            Review this PR against the Code Review Rules in AGENTS.md.
+            Focus on:
+            - Critical items (security, safety checks, consent, no secrets)
+            - Architectural compliance (deterministic logic, service-role client)
+            - Type safety and error handling
+            - Test coverage
+
+            Provide:
+            1. Summary (approve/request changes)
+            2. Critical issues (must fix)
+            3. Important issues (fix or justify)
+            4. Style suggestions (optional)
+
+            Be concise. Reference specific files and line numbers.

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://claude.ai/schemas/settings.json",
+  "hooks": {
+    "PreToolUse": {
+      "enabled": true,
+      "script": "node .claude/hooks/pre-tool-use.js"
+    },
+    "Stop": {
+      "enabled": true,
+      "script": "node .claude/hooks/stop.js"
+    }
+  },
+  "rules": [
+    "Never push directly to main branch",
+    "Never commit secrets or API keys",
+    "All PRs must be ≤800 lines (excluding generated files)",
+    "Write tests before implementation (TDD)",
+    "Run quality checks before committing (lint, typecheck, tests)"
+  ]
+}
