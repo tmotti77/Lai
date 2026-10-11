@@ -49,7 +49,9 @@ describe("resolveCurrentUserIds (read-only)", () => {
     h.cookies.set("co_anon", "tok-1");
     const ids = await resolveCurrentUserIds("auth-new");
     expect(ids).toEqual({ primaryId: anonId, authId: "auth-new", isAnonymous: false, linkedAnonymousId: null });
-    expect(h.fake.rows("users").find((r) => r.id === anonId)).toMatchObject({ is_anonymous: true, auth_id: undefined });
+    const row = h.fake.rows("users").find((r) => r.id === anonId)!;
+    expect(row.is_anonymous).toBe(true);
+    expect(row.auth_id ?? null).toBeNull();
     expect(h.fake.writes).toEqual([]);
   });
 
