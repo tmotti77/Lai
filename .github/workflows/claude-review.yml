@@ -10,6 +10,11 @@ jobs:
     timeout-minutes: 10
     # Skip if secret not configured (allows green CI before secret setup)
     if: vars.SKIP_CLAUDE_REVIEW != 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,13 +36,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          model: claude-sonnet-4.0
-          context-files: |
-            CLAUDE.md
-            AGENTS.md
-            docs/WORKFLOW.md
-          instructions: |
-            Review this PR against the Code Review Rules in AGENTS.md.
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Read CLAUDE.md, AGENTS.md and docs/WORKFLOW.md, then review this PR against the Code Review Rules in AGENTS.md.
             Focus on:
             - Critical items (security, safety checks, consent, no secrets)
             - Architectural compliance (deterministic logic, service-role client)
@@ -51,3 +54,6 @@ jobs:
             4. Style suggestions (optional)
 
             Be concise. Reference specific files and line numbers.
+            Post the review as a single PR comment using `gh pr comment`.
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
