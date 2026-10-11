@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   fake: null as unknown as FakeSupabaseT,
   cookies: new Map<string, string>(),
   authUser: null as AuthUser | null,
+  authError: null as Error | null,
   signOut: vi.fn(),
   requireConsent: vi.fn(),
   captureException: vi.fn(),
@@ -25,7 +26,10 @@ vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => h.fake.cli
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: {
-      getUser: async () => ({ data: { user: h.authUser }, error: null }),
+      getUser: async () => {
+        if (h.authError?.name === "TypeError") throw h.authError;
+        return { data: { user: h.authError ? null : h.authUser }, error: h.authError };
+      },
       signOut: h.signOut,
     },
   }),
@@ -33,6 +37,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/consent", () => ({ requireConsent: h.requireConsent, NoConsentError: class extends Error {} }));
 vi.mock("@sentry/nextjs", () => ({ captureException: h.captureException, captureMessage: vi.fn() }));
 
+import { AuthApiError, AuthRetryableFetchError, AuthSessionMissingError, AuthUnknownError } from "@supabase/supabase-js";
 import { DELETE } from "@/app/api/me/route";
 import { DELETE_CONFIRMATION } from "@/lib/privacy/delete";
 import { USER_DATA_TABLES } from "@/lib/privacy/registry";
@@ -72,6 +77,7 @@ beforeEach(() => {
   h.fake = makeFake();
   h.cookies.clear();
   h.authUser = null;
+  h.authError = null;
   h.signOut.mockReset().mockResolvedValue({ error: null });
   h.requireConsent.mockReset();
   h.captureException.mockReset();
@@ -312,5 +318,48 @@ describe("DELETE /api/me — lock", () => {
     const statuses = (await Promise.all([DELETE(deleteRequest()), DELETE(deleteRequest())])).map((r) => r.status);
     expect(statuses.sort()).toEqual([200, 409]);
     expectAGone();
+  });
+});
+
+describe("DELETE /api/me — auth service errors", () => {
+  it.each([
+    ["a retryable fetch error", () => new AuthRetryableFetchError("fetch failed", 0)],
+    ["an auth 5xx", () => new AuthApiError("upstream down", 503, "unexpected_failure")],
+    ["an auth 429", () => new AuthApiError("slow down", 429, "over_request_rate_limit")],
+    ["an unknown auth error", () => new AuthUnknownError("bad json", new Error("x"))],
+    ["a thrown error", () => new TypeError("network down")],
+  ])("%s → 503 and nothing is deleted, even with an anon cookie", async (_label, makeError) => {
+    const C = seedUser(h.fake, { anonToken: "tok-c" });
+    const cBefore = ownedCounts(h.fake, C.userId);
+    signIn(A);
+    h.cookies.set("co_anon", "tok-c");
+    h.authError = makeError();
+    const res = await DELETE(deleteRequest());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "auth_unavailable", retryable: true });
+    expect(ownedCounts(h.fake, A.userId)).toEqual(Object.fromEntries(TABLES.map((t) => [t, A.rows[t].length])));
+    expect(ownedCounts(h.fake, C.userId)).toEqual(cBefore);
+    expect(h.fake.callsOf("storage.remove")).toEqual([]);
+    expect(h.fake.callsOf("auth.admin.deleteUser")).toEqual([]);
+    expect(h.fake.authUsers.has("auth-a")).toBe(true);
+    expect(stagesCaptured()).toEqual(["identity"]);
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/co_anon=;/);
+  });
+
+  it("no session (AuthSessionMissingError) with a live co_anon → deletes the anonymous footprint", async () => {
+    h.authError = new AuthSessionMissingError();
+    h.cookies.set("co_anon", "tok-b");
+    const res = await DELETE(deleteRequest());
+    expect(res.status).toBe(200);
+    expect((await res.json()).report.auth_user).toBe("n/a");
+    expect(ownedCounts(h.fake, B.userId)).toEqual(zeroCounts());
+    expect(ownedCounts(h.fake, A.userId).users).toBe(1);
+  });
+
+  it("no session and no cookie → 401", async () => {
+    h.authError = new AuthSessionMissingError();
+    const res = await DELETE(deleteRequest());
+    expect(res.status).toBe(401);
+    expect(h.fake.writes).toEqual([]);
   });
 });

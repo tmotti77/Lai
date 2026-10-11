@@ -7,7 +7,9 @@ const h = vi.hoisted(() => ({
   fake: null as unknown as FakeSupabaseT,
   cookies: new Map<string, string>(),
   authUser: null as AuthUser | null,
+  authError: null as Error | null,
   requireConsent: vi.fn(),
+  captureException: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -22,14 +24,18 @@ vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => h.fake.cli
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: {
-      getUser: async () => ({ data: { user: h.authUser }, error: null }),
+      getUser: async () => {
+        if (h.authError?.name === "TypeError") throw h.authError;
+        return { data: { user: h.authError ? null : h.authUser }, error: h.authError };
+      },
       signOut: vi.fn(async () => ({ error: null })),
     },
   }),
 }));
 vi.mock("@/lib/consent", () => ({ requireConsent: h.requireConsent, NoConsentError: class extends Error {} }));
-vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn(), captureMessage: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({ captureException: h.captureException, captureMessage: vi.fn() }));
 
+import { AuthApiError, AuthRetryableFetchError, AuthSessionMissingError, AuthUnknownError } from "@supabase/supabase-js";
 import { GET } from "@/app/api/me/export/route";
 import { USER_DATA_TABLES } from "@/lib/privacy/registry";
 import { makeFake, seedUser, type SeededUser } from "./helpers/privacy-seed";
@@ -49,7 +55,9 @@ beforeEach(() => {
   h.fake = makeFake();
   h.cookies.clear();
   h.authUser = null;
+  h.authError = null;
   h.requireConsent.mockReset();
+  h.captureException.mockReset();
   delete process.env.DATA_RIGHTS_ENABLED;
   A = seedUser(h.fake, { authId: "auth-a", messages: 1500 });
   B = seedUser(h.fake, { anonToken: "tok-b" });
@@ -177,5 +185,43 @@ describe("GET /api/me/export", () => {
     process.env.DATA_RIGHTS_ENABLED = "false";
     signIn(A);
     expect((await GET()).status).toBe(503);
+  });
+});
+
+describe("GET /api/me/export — auth service errors", () => {
+  it.each([
+    ["a retryable fetch error", () => new AuthRetryableFetchError("fetch failed", 0)],
+    ["an auth 5xx", () => new AuthApiError("upstream down", 503, "unexpected_failure")],
+    ["an auth 429", () => new AuthApiError("slow down", 429, "over_request_rate_limit")],
+    ["an unknown auth error", () => new AuthUnknownError("bad json", new Error("x"))],
+    ["a thrown error", () => new TypeError("network down")],
+  ])("%s → 503, nothing exported, no slot claimed", async (_label, makeError) => {
+    signIn(A);
+    h.cookies.set("co_anon", "tok-b");
+    h.authError = makeError();
+    const res = await GET();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "auth_unavailable" });
+    expect(h.fake.writes).toEqual([]);
+    expect(h.fake.callsOf("storage.list")).toEqual([]);
+    expect(h.captureException).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tags: expect.objectContaining({ stage: "identity" }) }),
+    );
+  });
+
+  it("no session (AuthSessionMissingError) with a live co_anon → anonymous export", async () => {
+    h.authError = new AuthSessionMissingError();
+    h.cookies.set("co_anon", "tok-b");
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect((await res.json()).account).toMatchObject({ user_id: B.userId, is_anonymous: true, auth: null });
+  });
+
+  it("a rejected credential (auth 403) and no cookie → 401", async () => {
+    h.authError = new AuthApiError("invalid JWT", 403, "bad_jwt");
+    const res = await GET();
+    expect(res.status).toBe(401);
+    expect(h.fake.writes).toEqual([]);
   });
 });
