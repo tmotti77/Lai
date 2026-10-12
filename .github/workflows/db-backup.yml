@@ -1,0 +1,74 @@
+name: DB Backup
+
+on:
+  schedule:
+    - cron: "0 2 * * 0" # Sundays 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check secrets
+        id: check
+        env:
+          HAS_URL: ${{ secrets.SUPABASE_DB_URL != '' }}
+          HAS_PASS: ${{ secrets.BACKUP_PASSPHRASE != '' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$HAS_URL" = "true" ] && [ "$HAS_PASS" = "true" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            # A silent green skip on the weekly run would hide that no backups are being taken.
+            echo "::error::SUPABASE_DB_URL and/or BACKUP_PASSPHRASE not set. Scheduled DB backup cannot run. See docs/runbooks/db-backup.md."
+            exit 1
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SUPABASE_DB_URL and/or BACKUP_PASSPHRASE not set. Skipping DB backup. See docs/runbooks/db-backup.md."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.configured == 'true'
+        with:
+          persist-credentials: false
+
+      - name: Install postgresql-client-17 (PGDG)
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Assert client version
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          pg_dump --version
+          major=$(pg_dump --version | grep -oE '[0-9]+' | head -1)
+          [ "$major" -ge 17 ] || { echo "pg_dump major $major < 17"; exit 1; }
+
+      - name: Dump and encrypt
+        if: steps.check.outputs.configured == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: bash scripts/db-backup.sh "$RUNNER_TEMP/backup"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.configured == 'true'
+        with:
+          name: careeros-db-${{ github.run_id }}
+          path: ${{ runner.temp }}/backup/*.dump.gpg
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0
