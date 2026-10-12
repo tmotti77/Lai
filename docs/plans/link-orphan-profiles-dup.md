@@ -44,3 +44,24 @@ Users with no conversations: untouched. Re-run: no orphans with conversations re
 - T row `updated_at` bumps via trigger → it becomes the "latest" row; fine, it now contains everything.
 - Large `data` arrays: negligible (few orphans).
 - Rollback: transactional; data snapshot retained in `merged_orphan_profiles`.
+
+## Revision after Codex critique (supersedes "Approach" above)
+The critique shows a data-merge is not neutral: id-only skill dedupe drops id-less chat skills (P1), a merge bumps
+`updated_at` and changes which row the loader picks (P1), CV confirm *replaces* skills so a union can resurrect
+superseded skills (P2), and app writers race a JSON merge (P2). Skipping leaves every conflicting orphan exactly as it
+is today: no data lost, no change in what matching sees for those users (strict no-regression). So: **skip conflicts**.
+
+Final migration (edited in place; see "Migration history" below):
+1. Lock `career_profile` for the transaction (`lock table … in share row exclusive mode`) so app writers can't race the backfill.
+2. Disable `career_profile_set_updated_at` for the transaction and re-enable at the end, so linking does **not** change
+   `updated_at`. Otherwise a linked orphan would become the user's newest row and hide a newer linked row from the
+   loader (critique #2 applies to linking too).
+3. Per user with ≥1 conversation, T = latest conversation (`updated_at desc, id desc`). Link **one** orphan, the newest
+   (`updated_at desc, id desc`), to T **only if no row exists at (user, T)**. Every other orphan is left in place.
+4. Idempotent: on a re-run the guard finds the row at T and does nothing.
+Follow-up (separate issue, app code): make the loader read *all* of a user's rows (orphans included) with an explicit,
+tested precedence. That is the real fix for skipped orphans being invisible, and it's out of scope for a data migration.
+
+### Migration history
+`list_migrations` on prod (read-only) does not list it. It failed atomically on its only prod attempt, and there is no
+staging project in Supabase (only `career-os`). Supabase branches are not used. Local dev DBs get reset. → Edit in place.
