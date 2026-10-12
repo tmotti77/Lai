@@ -710,6 +710,7 @@ export type Database = {
           first_report_downloaded_at: string | null
           id: string
           is_anonymous: boolean
+          last_export_at: string | null
           nps_dismissed_at: string | null
           nps_eligibility_first_at: string | null
           nps_submitted_at: string | null
@@ -729,6 +730,7 @@ export type Database = {
           first_report_downloaded_at?: string | null
           id?: string
           is_anonymous?: boolean
+          last_export_at?: string | null
           nps_dismissed_at?: string | null
           nps_eligibility_first_at?: string | null
           nps_submitted_at?: string | null
@@ -748,6 +750,7 @@ export type Database = {
           first_report_downloaded_at?: string | null
           id?: string
           is_anonymous?: boolean
+          last_export_at?: string | null
           nps_dismissed_at?: string | null
           nps_eligibility_first_at?: string | null
           nps_submitted_at?: string | null
@@ -761,6 +764,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_user_data: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: Json
+      }
       increment_conversation_counters: {
         Args: {
           p_conversation_id: string

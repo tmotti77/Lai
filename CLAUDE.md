@@ -178,6 +178,12 @@ Two telemetry layers: rich per-user analysis in Supabase (`feedback` table + joi
 
 Architectural rule: any new mutation route that produces an analytics event MUST call `track()` from `lib/analytics.ts`, NOT `@vercel/analytics/server` directly. The wrapper is the single PII gate. Any new feedback-row mutation MUST go through `POST /api/feedback` with the discriminated-union Zod schema; never write directly from other routes.
 
+## User data rights (#51)
+
+- `GET /api/me/export` and `DELETE /api/me` require auth but deliberately skip `requireConsent`, because users can export and erase their data even after revoking consent.
+- Every new user-scoped table must be added to the user-data registry (`lib/privacy/registry.ts`) and to the `delete_user_data` SQL function. The coverage test (`tests/unit/privacy/coverage.test.ts`) enforces this.
+- The DB part of a hard delete stays ONE atomic SQL function (`delete_user_data`). Never add per-table deletes from TypeScript.
+
 ## Project-specific conventions
 
 - **Hebrew RTL throughout**: `<html dir="rtl" lang="he">`. Use Tailwind `rtl:` variants and logical properties (`ms-*`, `me-*`) instead of `ml-*`/`mr-*` where layouts depend on direction.

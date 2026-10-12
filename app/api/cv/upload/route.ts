@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getOrCreateAnonymousUserId } from "@/lib/anonymous";
@@ -8,6 +9,7 @@ import {
   MAX_FILE_SIZE_BYTES,
 } from "@/lib/cv/types";
 import { requireConsent, NoConsentError } from "@/lib/consent";
+import { isDeletionInProgress } from "@/lib/privacy/rateLimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,6 +67,17 @@ export async function POST(req: Request) {
   const ext = file.type === "application/pdf" ? "pdf" : "docx";
   const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
 
+  // An account deletion lists this user's folder before deleting the rows; an object
+  // stored now could slip past it (#51).
+  try {
+    if (await isDeletionInProgress(userId)) {
+      return Response.json({ error: "deletion_in_progress" }, { status: 409 });
+    }
+  } catch (err) {
+    Sentry.captureException(err, { tags: { context: "cv_upload", stage: "deletion_lock" } });
+    return Response.json({ error: "db_failed" }, { status: 500 });
+  }
+
   const svc = createServiceClient();
   const { error: uploadErr } = await svc.storage
     .from("cv-uploads")
@@ -83,6 +96,16 @@ export async function POST(req: Request) {
       sizeBytes: file.size,
     });
   } catch (err) {
+    // No row points at the object, so nothing else would find it: remove it now. The
+    // insert also fails this way when a concurrent account deletion removed the user.
+    const { error: removeErr } = await svc.storage.from("cv-uploads").remove([storagePath]);
+    if (removeErr) {
+      console.error("[cv/upload] orphan cleanup failed", { storagePath, error: removeErr.message });
+      Sentry.captureException(removeErr, {
+        tags: { context: "cv_upload", stage: "orphan_cleanup" },
+        extra: { storagePath },
+      });
+    }
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: "db_failed", message }, { status: 500 });
   }

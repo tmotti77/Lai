@@ -119,6 +119,78 @@ export async function getOrCreateAnonymousUserId(authedUserId?: string): Promise
   return newUser.id;
 }
 
+export interface CurrentUserIds {
+  /** users.id to act on. */
+  primaryId: string;
+  /** auth.users.id, null for anonymous visitors. */
+  authId: string | null;
+  isAnonymous: boolean;
+  /** An unpromoted anonymous row this browser's co_anon cookie still proves ownership of. */
+  linkedAnonymousId: string | null;
+}
+
+/**
+ * Read-only counterpart of getOrCreateAnonymousUserId for the data-rights routes (#51):
+ * exporting or deleting must never create or promote an account. Returns null when the
+ * visitor has no identity.
+ *
+ * A cookie only ever resolves to a row that is still anonymous. Unlike chat, these routes
+ * hand out or destroy a whole account, so a stale cookie for a promoted row grants nothing.
+ */
+export async function resolveCurrentUserIds(authedUserId?: string): Promise<CurrentUserIds | null> {
+  const cookieStore = await cookies();
+  const svc = createServiceClient();
+
+  const anonToken = cookieStore.get(ANON_COOKIE_NAME)?.value;
+  let anonUserId: string | null = null;
+  if (anonToken) {
+    const { data: session, error } = await svc
+      .from("anonymous_sessions")
+      .select("user_id")
+      .eq("token", anonToken)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (error) throw new Error(`resolveCurrentUserIds: ${error.message}`);
+    if (session) {
+      const { data: anonRow, error: rowErr } = await svc
+        .from("users")
+        .select("id")
+        .eq("id", session.user_id)
+        .eq("is_anonymous", true)
+        .maybeSingle();
+      if (rowErr) throw new Error(`resolveCurrentUserIds: ${rowErr.message}`);
+      anonUserId = anonRow?.id ?? null;
+    }
+  }
+
+  if (!authedUserId) {
+    return anonUserId
+      ? { primaryId: anonUserId, authId: null, isAnonymous: true, linkedAnonymousId: null }
+      : null;
+  }
+
+  const { data: own, error } = await svc
+    .from("users")
+    .select("id")
+    .eq("auth_id", authedUserId)
+    .maybeSingle();
+  if (error) throw new Error(`resolveCurrentUserIds: ${error.message}`);
+  if (own) {
+    return {
+      primaryId: own.id,
+      authId: authedUserId,
+      isAnonymous: false,
+      linkedAnonymousId: anonUserId && anonUserId !== own.id ? anonUserId : null,
+    };
+  }
+  // Signed in but never promoted: the anon row is the one getOrCreateAnonymousUserId
+  // would promote, so it is this person's account.
+  if (anonUserId) {
+    return { primaryId: anonUserId, authId: authedUserId, isAnonymous: false, linkedAnonymousId: null };
+  }
+  return null;
+}
+
 /**
  * Bootstraps the anonymous cookie from middleware so Server Components
  * never have to write cookies (which Next.js 16 forbids). Idempotent —

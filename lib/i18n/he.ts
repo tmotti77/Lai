@@ -409,6 +409,8 @@ export const he = {
       extractionFailed: "ניתוח הכישורים נכשל. נסה שוב.",
       saveFailed: "שמירת הכישורים נכשלה. נסה שוב.",
       noFile: "לא נבחר קובץ.",
+      // API returns "deletion_in_progress" while the account is being deleted (#51)
+      deletion_in_progress: "החשבון שלך נמצא בתהליך מחיקה, ולכן אי אפשר להעלות קבצים כרגע.",
     },
   },
   feedback: {
@@ -515,6 +517,12 @@ export const he = {
       noRecommendation: "אין המלצות. עבור קודם להמלצות.",
     },
     completed: "הושלם",
+  },
+  settings: {
+    export: {
+      fileNotice:
+        "קובץ זה מכיל את כל המידע שנשמר עליך ב-CareerOS: פרטי החשבון, הסכמות, שיחות, שאלונים, פרופיל קריירה, המלצות, תוכניות, קורות חיים, סימולציות ראיון ומשוב. קישורי ההורדה של קובצי קורות החיים תקפים ל-15 דקות בלבד. מטעמי אבטחה, אסימון ההתחברות האנונימי מוסתר.",
+    },
   },
 } as const;
 
