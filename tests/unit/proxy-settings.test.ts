@@ -65,6 +65,30 @@ describe("proxy on /settings", () => {
     expect(res.headers.get("set-cookie") ?? "").toBe("");
   });
 
+  // claude-review #58 note 4: the catch branch. If getUser throws after supabase-js has
+  // already buffered a cookie wipe, that wipe must be dropped (fail safe: the page sees the
+  // original session and decides), and the proxy must not throw.
+  it("getUser throws after buffering a cookie wipe: the wipe is dropped", async () => {
+    h.getUser.mockImplementation(async (opts: CookieOpts) => {
+      opts.cookies.setAll([{ name: SESSION, value: "", options: { maxAge: 0 } }]);
+      throw new AuthRetryableFetchError("network down", 0);
+    });
+    const res = await proxy(request("/settings", `${SESSION}=ok; co_anon=abc`));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(new RegExp(`${SESSION}=`));
+    expect(res.headers.get("x-middleware-request-cookie")).toContain(`${SESSION}=ok`);
+    expect(h.fake.writes).toEqual([]);
+  });
+
+  it("getUser throws a non-Auth error (e.g. TypeError): same fail-safe", async () => {
+    h.getUser.mockImplementation(async (opts: CookieOpts) => {
+      opts.cookies.setAll([{ name: SESSION, value: "", options: { maxAge: 0 } }]);
+      throw new TypeError("fetch failed");
+    });
+    const res = await proxy(request("/settings", `${SESSION}=ok`));
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(new RegExp(`${SESSION}=`));
+  });
+
   it("a valid session is still refreshed and written in the proxy", async () => {
     h.getUser.mockImplementation(async (opts: CookieOpts) => {
       opts.cookies.setAll([{ name: SESSION, value: "fresh", options: { path: "/" } }]);
