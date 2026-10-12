@@ -123,7 +123,7 @@ export function DeleteAccountDialog({
       </DialogTrigger>
       <DialogContent
         hideClose={deleting}
-        className="text-start"
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto text-start"
         onOpenAutoFocus={(e) => {
           e.preventDefault();
           inputRef.current?.focus();
