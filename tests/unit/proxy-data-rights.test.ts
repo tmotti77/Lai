@@ -37,9 +37,13 @@ describe("proxy on data-rights endpoints", () => {
     expect(res.headers.get("set-cookie") ?? "").not.toMatch(/co_anon=/);
   });
 
-  it.each(["/api/me", "/api/me/export"])("%s: the Supabase session is still refreshed", async (path) => {
-    await proxy(request(path));
-    expect(h.getUser).toHaveBeenCalledTimes(1);
+  // Codex P1 (#54): getUser() in the proxy clears the auth cookies when the session is
+  // rejected, so the route would see "no session" and fall back to co_anon, deleting the
+  // wrong identity. The proxy must leave auth untouched so the route can fail closed.
+  it.each(["/api/me", "/api/me/export"])("%s: the proxy does not touch the Supabase session", async (path) => {
+    const res = await proxy(request(path, "sb-x-auth-token=stale; co_anon=abc"));
+    expect(h.getUser).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie") ?? "").not.toMatch(/sb-x-auth-token=/);
   });
 
   it("does not treat lookalike paths as data-rights endpoints", async () => {
