@@ -16,6 +16,11 @@
 --  * updated_at is preserved (trigger disabled for this transaction) so linking does not change
 --    which row the loader treats as "latest".
 --  * Idempotent: a re-run finds the row at T and does nothing.
+--  * MUST run as ONE transaction (db push / apply_migration do). Do not split it: a mid-failure
+--    outside a transaction could leave career_profile_set_updated_at disabled.
+--  * Local-only verification: scripts/db-verify/run-link-orphans.sh (not in CI).
+--  * Prod records apply-time versions (applied via the Supabase apply_migration tool), so the
+--    old 20260903 file timestamp does not block applying; with `supabase db push` use --include-all.
 
 lock table public.career_profile in share row exclusive mode;
 
