@@ -9,7 +9,7 @@ import { DeleteRequestBody, DELETE_CONFIRMATION as REEXPORTED } from "@/lib/priv
 describe("lib/privacy/constants", () => {
   it("has no server-only import", () => {
     const src = readFileSync(path.resolve(__dirname, "../../../lib/privacy/constants.ts"), "utf8");
-    expect(src).not.toMatch(/server-only/);
+    expect(src).not.toMatch(/import\s+["']server-only["']/);
   });
 
   it("is the token the delete route accepts", () => {

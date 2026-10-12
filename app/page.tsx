@@ -1,11 +1,28 @@
 import Link from "next/link";
 import { he } from "@/lib/i18n/he";
 
-export default function HomePage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+// Set by the delete dialog after DELETE /api/me (#51). "partial": rows and account are
+// gone but some file cleanup didn't finish, which must not read as a complete erasure.
+const DELETED_NOTICES = {
+  "1": he.settings.delete.deletedNotice,
+  partial: he.settings.delete.deletedPartialNotice,
+} as const;
+
+export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const { home } = he;
+  const { deleted } = await searchParams;
+  const deletedNotice =
+    deleted === "1" || deleted === "partial" ? DELETED_NOTICES[deleted] : null;
 
   return (
     <div className="min-h-dvh">
+      {deletedNotice && (
+        <p role="status" className="border-b bg-muted/50 px-6 py-3 text-center text-sm">
+          {deletedNotice}
+        </p>
+      )}
       {/* Hero Section */}
       <section className="mx-auto flex min-h-[70vh] max-w-4xl flex-col items-center justify-center gap-6 px-6 py-16 text-center">
         <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">
@@ -101,8 +118,17 @@ export default function HomePage() {
       </section>
 
       {/* Footer Disclaimer */}
-      <footer className="border-t px-6 py-8 text-center text-xs text-muted-foreground">
-        {he.disclaimer.short}
+      <footer className="space-y-3 border-t px-6 py-8 text-center text-xs text-muted-foreground">
+        <p>{he.disclaimer.short}</p>
+        <nav className="flex flex-wrap items-center justify-center gap-4">
+          <Link href="/settings" className="underline-offset-4 hover:underline">
+            {he.settings.entryLink}
+          </Link>
+          <span aria-hidden className="text-muted-foreground/40">•</span>
+          <Link href="/privacy" className="underline-offset-4 hover:underline">
+            {he.settings.privacyLink}
+          </Link>
+        </nav>
       </footer>
     </div>
   );

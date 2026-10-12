@@ -136,6 +136,9 @@ export function RecommendationsClient({ occupations }: { occupations: Occupation
             <Button asChild size="sm" variant="outline">
               <a href="/api/report/pdf" download>{he.recommendations.downloadPdf}</a>
             </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/settings">{he.settings.entryLink}</Link>
+            </Button>
           </div>
         </div>
       )}

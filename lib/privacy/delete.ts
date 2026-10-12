@@ -5,11 +5,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { USER_DATA_TABLE_NAMES, type StorageBucket, type UserDataTable } from "@/lib/privacy/registry";
 import { claimDeletionLock, releaseDeletionLock } from "@/lib/privacy/rateLimit";
 import { listUserObjects, removeObjects } from "@/lib/privacy/storage";
+import { DELETE_CONFIRMATION } from "@/lib/privacy/constants";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-/** Wire token the client must send. ASCII and stable; the Hebrew typed word is UI only. */
-export const DELETE_CONFIRMATION = "DELETE_MY_ACCOUNT";
+export { DELETE_CONFIRMATION };
 export const DeleteRequestBody = z.object({ confirmation: z.literal(DELETE_CONFIRMATION) });
 
 export type DeletionStage = "lock" | "storage" | "db" | "auth";
