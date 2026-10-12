@@ -14,6 +14,8 @@ export async function updateSession(request: NextRequest) {
   // would clear a rejected session's cookies, so the route would see "no session" and fall
   // back to co_anon, deleting the wrong identity. Leave auth untouched so it fails closed
   // (401), and never mint an anonymous user for an export or delete.
+  // An expired access token is still refreshed: getUser() in the route handler refreshes
+  // it (and may write cookies there); a failed refresh surfaces as a coded AuthApiError.
   if (isDataRightsPath(request.nextUrl.pathname)) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });

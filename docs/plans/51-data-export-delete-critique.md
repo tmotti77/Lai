@@ -15,6 +15,9 @@ Retrospective: the Codex plan critique ran on 2026-10-12, after the backend was 
 | 9 | -  | Deleting `consents` removes proof-of-consent | claude-review | Legal question for the Phase 7 lawyer review |
 | 10 | - | Export built fully in memory | claude-review | Accepted for MVP; revisit with a cap or streaming if needed |
 
-Codex re-review after the fixes (2026-10-12) found one new **P1, open**: when the middleware's own `getUser()` hits an expired token with a revoked refresh token, it clears the session cookies, so the route sees `AuthSessionMissingError` instead of a rejected session and can fall back to a live `co_anon` (DELETE reports success but only the anonymous footprint is removed). Fix: skip middleware auth refresh on `/api/me*` (or propagate the rejection) with a middleware+route test. Pending.
+| 11 | P1 | Proxy `getUser()` cleared a rejected session's cookies, so DELETE could fall back to `co_anon` and delete the wrong identity | Codex review round 2 | Fixed (`50533be` test, `6184c33` fix): the proxy skips auth on `/api/me*` and the route fails closed (401). An expired access token is still refreshed by the route's own `getUser()` |
+| 12 | -  | Delete lock guards only CV upload | claude-review round 3 | Accepted: every FK to `users` is `ON DELETE CASCADE`, so a row written during the delete is removed with the user. Only Storage needs the guard |
+
+Codex review round 3 (2026-10-12, head `6184c33`): **no findings**. claude-review on the same head: approve, $0.45, no critical findings.
 
 #51 is not complete until part 2 (settings UI, privacy page, a11y) ships.
