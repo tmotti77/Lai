@@ -10,6 +10,12 @@ export function isDataRightsPath(pathname: string): boolean {
 }
 
 export async function updateSession(request: NextRequest) {
+  // The data-rights routes resolve identity themselves, read-only (#51). Refreshing here
+  // would clear a rejected session's cookies, so the route would see "no session" and fall
+  // back to co_anon, deleting the wrong identity. Leave auth untouched so it fails closed
+  // (401), and never mint an anonymous user for an export or delete.
+  if (isDataRightsPath(request.nextUrl.pathname)) return NextResponse.next({ request });
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -32,10 +38,6 @@ export async function updateSession(request: NextRequest) {
   );
 
   await supabase.auth.getUser();
-
-  // The data-rights routes resolve identity read-only (#51): minting an anonymous
-  // user here would make an export or delete create an account first.
-  if (isDataRightsPath(request.nextUrl.pathname)) return response;
 
   // Bootstrap anonymous cookie so server components never need to write one.
   // Next.js 16 forbids cookie writes from Server Components; we do it here in
