@@ -1,5 +1,6 @@
 import "server-only";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type SetAllCookies } from "@supabase/ssr";
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { serverEnv } from "@/lib/env";
 import { ANON_COOKIE_NAME, ensureAnonymousCookie } from "@/lib/anonymous";
@@ -7,6 +8,14 @@ import { ANON_COOKIE_NAME, ensureAnonymousCookie } from "@/lib/anonymous";
 /** GET /api/me/export and DELETE /api/me. */
 export function isDataRightsPath(pathname: string): boolean {
   return pathname === "/api/me" || pathname.startsWith("/api/me/");
+}
+
+/**
+ * /settings offers export and delete, so it must see a rejected session as rejected, not
+ * as "signed out" (which would show the anonymous footprint; #51 part 2 critique #1).
+ */
+export function isDataRightsPage(pathname: string): boolean {
+  return pathname === "/settings" || pathname.startsWith("/settings/");
 }
 
 export async function updateSession(request: NextRequest) {
@@ -20,6 +29,19 @@ export async function updateSession(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
+  const applyCookies = (cookiesToSet: Parameters<SetAllCookies>[0]) => {
+    cookiesToSet.forEach(({ name, value }) =>
+      request.cookies.set(name, value),
+    );
+    response = NextResponse.next({ request });
+    cookiesToSet.forEach(({ name, value, options }) =>
+      response.cookies.set(name, value, options),
+    );
+  };
+
+  const preserveIdentity = isDataRightsPage(request.nextUrl.pathname);
+  const buffered: Parameters<SetAllCookies>[0] = [];
+
   const supabase = createServerClient(
     serverEnv.NEXT_PUBLIC_SUPABASE_URL,
     serverEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -27,17 +49,27 @@ export async function updateSession(request: NextRequest) {
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+          if (preserveIdentity) buffered.push(...cookiesToSet);
+          else applyCookies(cookiesToSet);
         },
       },
     },
   );
+
+  if (preserveIdentity) {
+    // Still refresh here: a valid but expired session must be written by the proxy, since
+    // the page (an RSC) can't write cookies. But when the auth server rejects the session,
+    // supabase-js clears its cookies; drop that write so the page sees the rejected session
+    // and asks for sign-in again. Like /api/me*, never mint an anonymous user here.
+    let error: unknown = null;
+    try {
+      ({ error } = await supabase.auth.getUser());
+    } catch (err) {
+      error = err;
+    }
+    if (!error || isAuthSessionMissingError(error)) applyCookies(buffered);
+    return response;
+  }
 
   await supabase.auth.getUser();
 

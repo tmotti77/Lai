@@ -2,7 +2,7 @@
 /**
  * Multi-surface, multi-viewport Playwright smoke test with axe-core a11y scanning.
  *
- * Visits 14 app surfaces at 3 viewports (mobile/tablet/desktop), captures:
+ * Visits 15 app surfaces at 3 viewports (mobile/tablet/desktop), captures:
  *   - HTTP status
  *   - Full-page screenshot
  *   - Console errors & page errors
@@ -12,6 +12,13 @@
  *   - Thumbs interaction: verifies aria-pressed toggle on /recommendations + interview wrap-up
  *   - NPS prompt: if prompt is visible, verifies 11 radio buttons render correctly
  *   - Admin export: verifies 200+CSV with Bearer token; 401 without token
+ *
+ * #51 additions:
+ *   - Delete-account dialog on /settings, opened, at 320/375/1280: axe on the open, error and
+ *     pending states; Tab/Shift+Tab stay inside; Enter while unconfirmed sends nothing;
+ *     controls visible at narrow width; Escape returns focus to the trigger.
+ *     DELETE /api/me is intercepted with page.route and NEVER reaches the server.
+ *     Set SKIP_DELETE_DIALOG=1 when the target runs with DATA_RIGHTS_ENABLED=false.
  *
  * Writes a JSON summary to ./screenshots/report.json and exits non-zero
  * if any critical/serious a11y violations OR console errors are found.
@@ -51,6 +58,7 @@ const SURFACES = [
   { path: "/sign-in",                name: "sign-in"               },
   { path: "/privacy",                name: "privacy"               },
   { path: "/terms",                  name: "terms"                 },
+  { path: "/settings",               name: "settings"              },
 ];
 
 // Ensure screenshots dir exists before any writes
@@ -252,6 +260,124 @@ const phase6bErrors = [];
   await browser6b.close();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// #51: delete-account dialog, open, in a real browser. Required, not optional.
+// Every DELETE /api/me is fulfilled or held by page.route, so nothing is ever deleted.
+// ─────────────────────────────────────────────────────────────────────────────
+const deleteDialogErrors = [];
+
+{
+  const browserDd = await chromium.launch({ headless: true });
+  const axeScan = async (page, label) => {
+    const r = await new AxeBuilder({ page })
+      .include('[role="dialog"]')
+      .options({ runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag22aa"] } })
+      .analyze();
+    const bad = r.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+    if (bad.length) throw new Error(`${label}: axe ${bad.map((v) => v.id).join(", ")}`);
+  };
+  const activeInDialog = (page) =>
+    page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')));
+
+  for (const vp of [
+    { name: "narrow-320", width: 320, height: 568 },
+    { name: "mobile", width: 375, height: 667 },
+    { name: "desktop", width: 1280, height: 800 },
+  ]) {
+    const ctx = await browserDd.newContext({ viewport: { width: vp.width, height: vp.height }, locale: "he-IL" });
+    const page = await ctx.newPage();
+    let deleteCalls = 0;
+    let mode = "error"; // "error" → fulfil 500; "hold" → never respond
+    await page.route("**/api/me", async (route) => {
+      if (route.request().method() !== "DELETE") return route.continue();
+      deleteCalls++;
+      if (mode === "error") {
+        return route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "deletion_incomplete", stage: "db", retryable: true }),
+        });
+      }
+      // "hold": leave the request pending so the dialog stays in its deleting state.
+    });
+
+    try {
+      // /settings never mints an identity; visit / first so this context has one.
+      await page.goto(`${BASE}/`, { waitUntil: "networkidle", timeout: 30000 });
+      await page.goto(`${BASE}/settings`, { waitUntil: "networkidle", timeout: 30000 });
+      const trigger = page.getByRole("button", { name: "מחיקת המידע שלי" });
+      if ((await trigger.count()) === 0) {
+        // With DATA_RIGHTS_ENABLED=false there is no dialog to check; opt out explicitly.
+        if (process.env.SKIP_DELETE_DIALOG === "1") {
+          console.log(`[51] ${vp.name}: SKIP_DELETE_DIALOG=1, delete dialog checks skipped`);
+          await ctx.close();
+          continue;
+        }
+        throw new Error("delete trigger not rendered (data rights disabled? set SKIP_DELETE_DIALOG=1)");
+      }
+      await trigger.click();
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor({ state: "visible" });
+      await axeScan(page, `${vp.name} open`);
+
+      // Focus starts in the input and Tab / Shift+Tab never leave the dialog.
+      for (const key of ["Tab", "Tab", "Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+        await page.keyboard.press(key);
+        if (!(await activeInDialog(page))) throw new Error(`${vp.name}: focus escaped the dialog on ${key}`);
+      }
+
+      // Enter / Space on an unconfirmed button send nothing.
+      const input = dialog.getByLabel(/מחק/);
+      await input.fill("מח");
+      await input.press("Enter");
+      const confirm = dialog.getByRole("button", { name: "מחיקה לצמיתות" });
+      await confirm.focus();
+      await page.keyboard.press("Space");
+      await page.keyboard.press("Enter");
+      if (deleteCalls !== 0) throw new Error(`${vp.name}: unconfirmed dialog sent DELETE`);
+
+      // Every control is reachable on screen at this width (the content scrolls if needed).
+      for (const name of ["ביטול", "מחיקה לצמיתות"]) {
+        const btn = dialog.getByRole("button", { name });
+        await btn.scrollIntoViewIfNeeded();
+        if (!(await btn.isVisible())) throw new Error(`${vp.name}: "${name}" not visible`);
+        const box = await btn.boundingBox();
+        if (!box || box.x < 0 || box.x + box.width > vp.width) throw new Error(`${vp.name}: "${name}" overflows horizontally`);
+      }
+
+      // Error state (intercepted 500).
+      await input.fill("מחק");
+      await confirm.click();
+      await dialog.getByRole("alert").waitFor({ state: "visible" });
+      await axeScan(page, `${vp.name} error`);
+
+      // Escape closes and returns focus to the trigger.
+      await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "hidden" });
+      const focusOnTrigger = await trigger.evaluate((el) => el === document.activeElement);
+      if (!focusOnTrigger) throw new Error(`${vp.name}: focus not returned to the trigger`);
+
+      // Pending state (held request): Escape must not close it.
+      mode = "hold";
+      await trigger.click();
+      await dialog.waitFor({ state: "visible" });
+      await dialog.getByLabel(/מחק/).fill("מחק");
+      await dialog.getByRole("button", { name: "מחיקה לצמיתות" }).click();
+      await dialog.getByRole("button", { name: /מוחק/ }).waitFor({ state: "visible" });
+      await axeScan(page, `${vp.name} pending`);
+      await page.keyboard.press("Escape");
+      if (!(await dialog.isVisible())) throw new Error(`${vp.name}: pending dialog closed on Escape`);
+
+      console.log(`[51] ${vp.name}: delete dialog checks passed (${deleteCalls} intercepted DELETE)`);
+    } catch (err) {
+      deleteDialogErrors.push({ check: `delete-dialog:${vp.name}`, error: err.message });
+      console.error(`[51] delete-dialog:${vp.name} FAILED: ${err.message}`);
+    }
+    await ctx.close();
+  }
+  await browserDd.close();
+}
+
 // Write JSON report
 writeFileSync("./screenshots/report.json", JSON.stringify(results, null, 2));
 console.log("\nFull report: ./screenshots/report.json");
@@ -269,9 +395,17 @@ if (phase6bErrors.length > 0) {
   for (const e of phase6bErrors) console.error(`   • ${e.check}: ${e.error}`);
 }
 
-if (fails.length > 0 || phase6bErrors.length > 0) {
-  const total = fails.length + phase6bErrors.length;
-  console.error(`\n❌ ${total} failure(s) total (${fails.length} surface/viewport, ${phase6bErrors.length} Phase 6b)`);
+if (deleteDialogErrors.length > 0) {
+  console.error(`\n❌ ${deleteDialogErrors.length} delete-dialog check(s) failed:`);
+  for (const e of deleteDialogErrors) console.error(`   • ${e.check}: ${e.error}`);
+}
+
+if (fails.length > 0 || phase6bErrors.length > 0 || deleteDialogErrors.length > 0) {
+  const total = fails.length + phase6bErrors.length + deleteDialogErrors.length;
+  console.error(
+    `\n❌ ${total} failure(s) total (${fails.length} surface/viewport, ${phase6bErrors.length} Phase 6b, ` +
+    `${deleteDialogErrors.length} delete dialog)`,
+  );
   process.exit(1);
 }
 console.log("\n✅ All surfaces clean");
