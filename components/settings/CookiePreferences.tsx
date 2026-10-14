@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { he } from "@/lib/i18n/he";
 import { useCookieConsent } from "@/lib/cookie-consent/useCookieConsent";
 import { setAnalyticsConsent } from "@/lib/cookie-consent/store";
@@ -38,13 +39,32 @@ export function CookiePreferences() {
           type="button"
           role="switch"
           aria-checked={granted}
-          aria-labelledby="cookie-preferences-heading"
+          aria-label={c.settings.toggleLabel}
           aria-describedby="cookie-preferences-description"
           aria-busy={isUnknown}
           disabled={isUnknown}
-          className="min-h-11 min-w-11 rounded-full border border-border px-4 py-2 text-sm disabled:opacity-50"
           onClick={handleToggle}
-        />
+          className={cn(
+            "relative inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "disabled:opacity-50"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-flex h-6 w-11 items-center rounded-full border border-border transition-colors",
+              granted ? "bg-primary" : "bg-muted"
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "inline-block h-5 w-5 rounded-full bg-background shadow transition-transform",
+                granted ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5 rtl:-translate-x-0.5"
+              )}
+            />
+          </span>
+        </button>
       </div>
       {notPersisted && (
         <p role="status" className="text-xs text-muted-foreground">

@@ -54,6 +54,13 @@ describe("CookiePreferences", () => {
     expect(screen.getByText(he.cookieConsent.settings.unset)).toBeInTheDocument();
   });
 
+  it("exposes a dedicated accessible name distinct from the section heading", () => {
+    seed(false);
+    render(<CookiePreferences />);
+    const toggle = screen.getByRole("switch", { name: he.cookieConsent.settings.toggleLabel });
+    expect(toggle).toHaveAccessibleName(he.cookieConsent.settings.toggleLabel);
+  });
+
   it("clicking the switch toggles and persists the opposite value", () => {
     seed(false);
     render(<CookiePreferences />);
