@@ -48,7 +48,7 @@ export function ChatShell({ initialMessages = [], initialStage = "onboarding" }:
   }, [isLoading, messages.length]);
 
   return (
-    <div className="mx-auto flex h-dvh max-w-2xl flex-col">
+    <div className="mx-auto flex h-full max-w-2xl flex-col">
       <ConsentDialog />
       <DisclaimerBanner />
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">

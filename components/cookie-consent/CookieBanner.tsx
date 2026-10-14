@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { he } from "@/lib/i18n/he";
@@ -12,7 +13,21 @@ import { setAnalyticsConsent } from "@/lib/cookie-consent/store";
 // default deny). No autofocus/focus trap — it must never steal focus from the chat input.
 export function CookieBanner() {
   const status = useCookieConsent();
-  if (status !== "unset") return null;
+  const [notPersisted, setNotPersisted] = useState(false);
+
+  function handleChoice(granted: boolean) {
+    const persisted = setAnalyticsConsent(granted);
+    setNotPersisted(!persisted);
+  }
+
+  if (status !== "unset") {
+    if (!notPersisted) return null;
+    return (
+      <section role="status" dir="rtl" className="border-t bg-background/95 px-4 py-2 text-xs text-muted-foreground">
+        {he.cookieConsent.notPersisted}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -41,7 +56,7 @@ export function CookieBanner() {
             type="button"
             variant="secondary"
             className="min-h-11 min-w-11"
-            onClick={() => setAnalyticsConsent(false)}
+            onClick={() => handleChoice(false)}
           >
             {he.cookieConsent.essentialOnly}
           </Button>
@@ -49,7 +64,7 @@ export function CookieBanner() {
             type="button"
             variant="secondary"
             className="min-h-11 min-w-11"
-            onClick={() => setAnalyticsConsent(true)}
+            onClick={() => handleChoice(true)}
           >
             {he.cookieConsent.acceptAnalytics}
           </Button>

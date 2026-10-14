@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { he } from "@/lib/i18n/he";
 import { useCookieConsent } from "@/lib/cookie-consent/useCookieConsent";
@@ -10,12 +11,18 @@ import { setAnalyticsConsent } from "@/lib/cookie-consent/store";
 // depend on identity or sign-in, so it renders in every /settings view state.
 export function CookiePreferences() {
   const status = useCookieConsent();
+  const [notPersisted, setNotPersisted] = useState(false);
   const c = he.cookieConsent;
   const granted = status === "granted";
   const isUnknown = status === "unknown";
   const isUnset = isUnknown || status === "unset";
 
   const statusText = isUnset ? c.settings.unset : granted ? c.settings.on : c.settings.off;
+
+  function handleToggle() {
+    const persisted = setAnalyticsConsent(!granted);
+    setNotPersisted(!persisted);
+  }
 
   return (
     <Card className="space-y-3 p-6">
@@ -36,9 +43,14 @@ export function CookiePreferences() {
           aria-busy={isUnknown}
           disabled={isUnknown}
           className="min-h-11 min-w-11 rounded-full border border-border px-4 py-2 text-sm disabled:opacity-50"
-          onClick={() => setAnalyticsConsent(!granted)}
+          onClick={handleToggle}
         />
       </div>
+      {notPersisted && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {c.notPersisted}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">{c.settings.essentialNote}</p>
     </Card>
   );

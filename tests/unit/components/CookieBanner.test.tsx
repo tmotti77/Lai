@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { he } from "@/lib/i18n/he";
 import {
@@ -22,6 +22,8 @@ function seed(analytics: boolean, version = COOKIE_CONSENT_VERSION) {
 }
 
 beforeEach(() => {
+  // Restore spies first so a leaked failing setItem mock can't break the reset write below.
+  vi.restoreAllMocks();
   // Clear any in-memory override left by a previous test's failed write, then clear storage.
   setAnalyticsConsent(false);
   window.localStorage.clear();
@@ -100,5 +102,19 @@ describe("CookieBanner", () => {
     }
     // Equal weight: same variant/size classes on both buttons (decision 8).
     expect(accept.className).toBe(essential.className);
+  });
+
+  it("surfaces the notPersisted message when the write fails", () => {
+    // jsdom's localStorage methods live on Storage.prototype, so an own-property spy on
+    // window.localStorage never intercepts the store's call.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    render(<CookieBanner />);
+    fireEvent.click(screen.getByRole("button", { name: he.cookieConsent.essentialOnly }));
+
+    expect(screen.queryByRole("region", { name: he.cookieConsent.title })).not.toBeInTheDocument();
+    expect(screen.getByText(he.cookieConsent.notPersisted)).toBeInTheDocument();
   });
 });

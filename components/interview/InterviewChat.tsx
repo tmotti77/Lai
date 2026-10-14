@@ -152,7 +152,7 @@ export function InterviewChat({
   }
 
   return (
-    <div dir="rtl" className="mx-auto flex h-dvh max-w-3xl flex-col">
+    <div dir="rtl" className="mx-auto flex h-full max-w-3xl flex-col">
       <header className="flex items-center justify-between border-b p-4">
         <div>
           <div className="text-sm font-medium">{session.target_role_he}</div>

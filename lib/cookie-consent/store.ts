@@ -40,13 +40,14 @@ export function hasAnalyticsConsent(): boolean {
   return getStatus() === "granted";
 }
 
-export function setAnalyticsConsent(granted: boolean): void {
+export function setAnalyticsConsent(granted: boolean): boolean {
   const { preference, persisted } = writePreference(getLocalStorage(), granted, new Date());
   memory = preference;
   memoryIsOverride = !persisted;
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: { persisted } }));
   }
+  return persisted;
 }
 
 export function subscribe(callback: () => void): () => void {
