@@ -75,7 +75,7 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
   - `clearPreference(storage)`.
 - `lib/cookie-consent/store.ts`: a tiny external store for `useSyncExternalStore`, with an explicit **precedence contract**:
   - Internal state is `{ memory: CookiePreference | null, memoryIsOverride: boolean }` plus whatever `readPreference(localStorage)` currently returns.
-  - **Precedence contract:** if `writePreference` returned `persisted: true`, the in-memory override is cleared (storage is now the single source of truth again) and `getStatus()` reads from storage. If it returned `persisted: false`, `memoryIsOverride` is set `true` and `getStatus()` serves `memory` for the rest of the tab's lifetime, **ignoring** whatever is in storage (including a stale prior choice) until either (a) a successful write happens, or (b) a genuine cross-tab `storage` event fires — which **does** clear the override, because a `storage` event only fires for a real, successful write from another tab, so it's evidence storage is usable again. A reload with no new write re-reads storage from scratch (the override was only ever in-memory) — this is unavoidable and on dropdown documented behavior, not a bug: a failed write means the user's choice silently does not survive their own reload, so the banner may re-show after a refresh if the prior write failed. This is the known, accepted trade-off of "never throw"; it is not hidden from the user because `writePreference`'s `persisted` flag is surfaced up to the UI (step 3) as a one-line inline notice when `persisted === false`.
+  - **Precedence contract:** if `writePreference` returned `persisted: true`, the in-memory override is cleared (storage is now the single source of truth again) and `getStatus()` reads from storage. If it returned `persisted: false`, `memoryIsOverride` is set `true` and `getStatus()` serves `memory` for the rest of the tab's lifetime, **ignoring** whatever is in storage (including a stale prior choice) until either (a) a successful write happens, or (b) a genuine cross-tab `storage` event fires — which **does** clear the override, because a `storage` event only fires for a real, successful write from another tab, so it's evidence storage is usable again. A reload with no new write re-reads storage from scratch (the override was only ever in-memory) — this is unavoidable, documented behavior, not a bug: a failed write means the user's choice silently does not survive their own reload, so the banner may re-show after a refresh if the prior write failed. This is the known, accepted trade-off of "never throw"; it is not hidden from the user because `writePreference`'s `persisted` flag is surfaced up to the UI (step 3) as a one-line inline notice when `persisted === false`.
   - `getStatus(): "unset" | "granted" | "denied"`, a string snapshot so identity stays stable.
   - `getServerStatus(): "unknown"`. The SSR and hydration snapshot, so the server never renders the banner and there's no hydration mismatch.
   - `setAnalyticsConsent(granted)` calls `writePreference`, applies the precedence contract above, then dispatches `careeros:cookie-consent` on `window` with `{ persisted }` in `detail`.
@@ -101,7 +101,7 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
 **Files:**
 - New `components/cookie-consent/ConsentedAnalytics.tsx` (`"use client"`). It uses `useCookieConsent()`, renders `<Analytics beforeSend={(e) => (hasAnalyticsConsent() ? e : null)} />` only when the status is `"granted"`, and renders `null` for `unknown` / `unset` / `denied`.
 - `app/layout.tsx`: remove the direct `@vercel/analytics/next` import and replace `<Analytics />` with `<ConsentedAnalytics />`. Add a one-line comment saying client trackers mount only through this wrapper.
-- `lib/analytics.ts`: call `vercelTrack(event, props, { headers: SERVER_EVENT_HEADERS })`, where the constant contains `cookie: ""`, `"x-forwarded-for": ""` and a constant `user-agent` (decision 4). Add a comment explaining why, with a pointer to #63. Keep the `NODE_ENV === "test"` early return.
+- `lib/analytics.ts`: **no code change** (decision 4). Add a one-line comment above `track()` noting the open risk — the installed SDK may forward `requestContext.url` regardless of headers passed — and the invariant it depends on: no tracked call site may put sensitive data in its own route's URL/query string. Keep the `NODE_ENV === "test"` early return as-is.
 
 **Test:** `tests/unit/components/ConsentedAnalytics.test.tsx` (jsdom; `vi.mock("@vercel/analytics/next")` with a stub that records its props and renders a `data-testid` marker):
 - No stored preference → the marker is absent.
@@ -110,33 +110,31 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
 - `setAnalyticsConsent(true)` after mount → appears without a reload.
 - After a revoke, the captured `beforeSend({url})` returns `null`. While granted, it returns the event unchanged.
 
-**Test:** extend `tests/unit/analytics.test.ts`. With `NODE_ENV=production`, `vercelTrack` gets a third argument whose `headers` contain `cookie: ""` and `x-forwarded-for: ""`, and no `request`. Update the existing `toHaveBeenCalledWith` expectation.
-
 **Test:** add a static guard in `tests/unit/cookie-consent/no-direct-analytics.test.ts`. It globs `app/**/*.tsx` + `components/**/*.tsx` and asserts that `@vercel/analytics/next` / `@vercel/analytics/react` is imported **only** by `components/cookie-consent/ConsentedAnalytics.tsx`. This stops a future re-introduction of the unconditional mount.
+
+**Test:** `tests/unit/cookie-consent/no-processing-coupling.test.ts` (node env), pinning the critique's P2 finding that an essential-only cookie choice must never be read as, or coupled to, DB-backed processing consent: calling `setAnalyticsConsent(false)` touches only the `careeros.cookieConsent` localStorage key — it does not read or write `co_anon`/`sb-*` cookies and imports nothing from `lib/consent.ts` or `components/chat/ConsentDialog.tsx`. Assert via a static import-graph check (same glob technique as the test above) that nothing under `lib/cookie-consent/**` imports `lib/consent` or `ConsentDialog`, so `requireConsent`'s `processing`/`disclaimer` purposes stay governed solely by `ConsentDialog`, independent of the cookie banner's choice.
 
 ### Step 3 — Non-modal bottom banner (Hebrew RTL)
 
 **Files:**
-- `lib/i18n/he.ts`: new top-level `cookieConsent` block with `title`, `body` (essential cookies keep the app working, so chat and the anonymous session always work; optional anonymous usage statistics through Vercel Analytics), `acceptAnalytics`, `essentialOnly`, `privacyLink`, `settingsLink`, `regionLabel`, and the `settings.*` strings for step 4. Mark it `// draft — pending legal review (#63)`, the same convention as `privacy.version`.
+- `lib/i18n/he.ts`: new top-level `cookieConsent` block with `title`, `body` (essential cookies keep the app working, so chat and the anonymous session always work; optional anonymous usage statistics through Vercel Analytics), `acceptAnalytics`, `essentialOnly`, `privacyLink`, `settingsLink`, and the `settings.*` strings for step 4. No separate `regionLabel` key (decision 9) — the region's accessible name is the visible `title` string itself. Mark it `// draft — pending legal review (#63)`, the same convention as `privacy.version`.
 - New `components/cookie-consent/CookieBanner.tsx` (`"use client"`):
   - Renders only when the status is `"unset"`, so nothing is rendered for `unknown` (SSR and first paint), `granted` or `denied`.
-  - `<section role="region" aria-labelledby="cookie-banner-title" dir="rtl" className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 …">`, with an `h2` title, body text, and links to `/privacy` and `/settings` (`next/link`, underlined, `min-h-11 inline-flex items-center` tap target).
-  - Two `<Button>`s with equal weight (decision 8), each `min-h-11 min-w-11`, calling `setAnalyticsConsent(true|false)`.
-  - **No autofocus** and no focus trap, so it doesn't steal focus from the chat input. It sits last in the DOM, so keyboard users reach it after the page content. Visible focus rings come from the shadcn `Button`.
-  - Height publishing per decision 7: a `ResizeObserver` (guarded with `typeof ResizeObserver !== "undefined"`) sets `--cookie-banner-h`, and unmount/hide resets it to `0px`.
+  - `<section role="region" aria-labelledby="cookie-banner-title" dir="rtl" className="border-t bg-background/95 …">` — an ordinary block, no `position: fixed`, no `z-index`, no `inset-x-0`/`bottom-0` (decisions 6–7). The `h2` (`id="cookie-banner-title"`) renders `he.cookieConsent.title` directly, so `aria-labelledby` and the visible heading are the same text. Body text and links to `/privacy` and `/settings` follow (`next/link`, underlined, `min-h-11 inline-flex items-center` tap target).
+  - Two `<Button variant="secondary">`s with equal weight (decision 8), each `min-h-11 min-w-11`, side by side, calling `setAnalyticsConsent(true|false)`.
+  - **No autofocus** and no focus trap, so it doesn't steal focus from the chat input. Visible focus rings come from the shadcn `Button`.
+  - No height-publishing mechanism needed: rendered in normal flow, it pushes following content down like any other block (decision 7). No `ResizeObserver`, no CSS custom property.
   - Imports nothing from `components/chat/ConsentDialog` or `/api/consent`.
-- `app/layout.tsx`: mount `<CookieBanner />` after `{children}`.
-- `app/globals.css`: `body { padding-bottom: var(--cookie-banner-h, 0px); }`.
-- `components/chat/ChatShell.tsx:51` and `components/interview/InterviewChat.tsx:155`: change `h-dvh` → `h-[calc(100dvh-var(--cookie-banner-h,0px))]`. `components/cv/CvReview.tsx:288`: `bottom-0` → `bottom-[var(--cookie-banner-h,0px)]`. Class-only changes.
+- `app/layout.tsx`: mount `<CookieBanner />` as a normal sibling, above `{children}`, inside the body.
+- No edits to `app/globals.css`, `components/chat/ChatShell.tsx`, `components/interview/InterviewChat.tsx`, or `components/cv/CvReview.tsx` — there is no composer/save-bar offset to compute because nothing overlaps (decision 7).
 - `tests/unit/privacy/no-hebrew-outside-i18n.test.ts`: add `components/cookie-consent/**/*.{ts,tsx}` to the glob, and add `CookieBanner.tsx` to the "matches the files it is meant to guard" list.
 
 **Test:** `tests/unit/components/CookieBanner.test.tsx` (jsdom):
-- With no preference, the banner region is shown via `getByRole("region", { name: he.cookieConsent.regionLabel })`, with both buttons, and links with `href="/privacy"` and `href="/settings"`.
+- With no preference, the banner region is shown via `getByRole("region", { name: he.cookieConsent.title })`, with both buttons, and links with `href="/privacy"` and `href="/settings"`.
 - **Non-blocking essential-only path:** render the banner next to a sibling `<input aria-label="composer">`. Clicking `essentialOnly` hides the banner and persists `analytics:false`. The sibling input is still enabled and focusable, and nothing in the tree has `aria-modal` or `inert`. Also assert that while the banner is visible the sibling stays interactive (`fireEvent.change` works, `document.activeElement` isn't moved to the banner on mount).
 - Accept → hides, persists `analytics:true`.
 - A stored valid preference → not rendered. A stored older-version preference → rendered (re-show on version bump).
-- `--cookie-banner-h` resets to `0px` after a choice.
-- Both buttons carry the `min-h-11` class (a guard for the 44px target).
+- Both buttons carry the `variant="secondary"` + `min-h-11` classes (guards for decision 8's equal weight and the 44px target).
 
 ### Step 4 — Settings toggle, privacy copy, docs
 
@@ -149,11 +147,8 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
   - Server-side aggregate counters that carry no browser identifiers.
   - Changing the choice in settings.
   Bump `privacy.version` to `0.3`. **Don't** assert "cookieless" for Vercel in the copy unless that's confirmed against Vercel's current docs during implementation.
-- `CLAUDE.md`: add a short "Cookie consent (#63)" section with these rules:
-  - Client trackers mount only via `ConsentedAnalytics`.
-  - Bump `COOKIE_CONSENT_VERSION` when adding a non-essential category.
-  - Server `track()` must not forward request headers.
-  - `ConsentDialog` (DB consent) is separate.
+
+No `CLAUDE.md` edit in this plan (dropped per critique P3) — `CLAUDE.md` is checked-in project guidance the owner curates; the static guards added in steps 1–2 (`no-direct-analytics.test.ts`, `no-processing-coupling.test.ts`) already enforce the two rules that would have gone there in code, which is more durable than a doc note.
 
 **Test:** `tests/unit/components/CookiePreferences.test.tsx` (jsdom): reflects the stored state (`aria-checked`). A click toggles and persists. A toggle from settings hides a mounted `CookieBanner` in the same tree, because of the shared store event. Keyboard `Enter`/`Space` work through the native `<button>`.
 
@@ -167,7 +162,7 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
 |---|---|
 | Hebrew RTL banner, copy in `he.ts` | Step 3, plus the extended no-Hebrew guard |
 | Essential vs analytics distinction | Banner body (step 3), settings card (step 4), privacy section (step 4) |
-| Essential-only never blocks core use | Default-deny, non-modal, composer offset (decisions 3, 6, 7); test in step 3 |
+| Essential-only never blocks core use | Default-deny, non-modal, normal document flow (decisions 3, 6, 7); test in step 3 |
 | Persist; re-show only on version change / cleared | Step 1 helper + tests; re-show test in step 3 |
 | Links to `/privacy` and `/settings` | Step 3 |
 | Client Analytics not loaded before consent; server decision documented | Step 2; decision 4 |
@@ -179,5 +174,4 @@ Test conventions: Vitest defaults to `environment: "node"`. Component tests opt 
 
 - **Legal sufficiency** (out of scope): flag for Moti/expert. Is a banner required before closed beta, and is "server aggregate counters without identifiers" acceptable without consent under the Israeli Privacy Protection Law (Amendment 13)? If the answer is no, the fallback is small: gate `track()` on a mirrored `co_cookie_consent` cookie, which needs a version-bump plus cookie write in `store.ts`.
 - **Vercel server events without UA/IP** may be filtered or lose device breakdowns. Verify on preview (decision 4).
-- **Pages with their own bottom-fixed UI** added later must use `--cookie-banner-h`. The CLAUDE.md note covers this.
 - **Sentry is server/edge only** (Phase 6c), so it's not a client tracker and isn't affected. If the browser SDK lands later (6c.5), it must go through the same gate or be justified as essential.
