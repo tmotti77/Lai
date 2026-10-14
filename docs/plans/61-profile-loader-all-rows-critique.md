@@ -1,0 +1,13 @@
+The plan largely matches #61, but needs these corrections. GitHub was unreachable, so I compared against the issue criteria quoted in the plan and the current code.
+
+1. **P1 — “No limit” does not guarantee all rows.** [Step 2](/workspace/projects/careeros/lai-51/docs/plans/61-profile-loader-all-rows.md:107) ignores the API row cap; [local Supabase config](/workspace/projects/careeros/lai-51/supabase/config.toml:18) sets `max_rows = 1000`. Paginate with stable ordering. Replace the “no `.limit()`” assertion with a multi-page test proving a skill on the final page survives, and a later-page failure rejects the whole load.
+
+2. **P2 — Single-row compatibility is overstated.** [The short-circuit](/workspace/projects/careeros/lai-51/docs/plans/61-profile-loader-all-rows.md:53) differs from today when a latest conversation exists but the sole profile belongs to another conversation or is orphaned: today that path deduplicates skills. The proposed hash test compares against the *new expected shape*, not existing behavior. Add this exact fixture and explicitly resolve whether preserving raw data or preserving existing behavior takes priority.
+
+3. **P2 — New DB errors can expose internal details.** [The throw-on-error change](/workspace/projects/careeros/lai-51/docs/plans/61-profile-loader-all-rows.md:110) relies on a route catch that returns the exception message to clients. Return a generic error and log details server-side. Test failures of both conversation and profile reads, asserting HTTP 500 and no ranking/cache write.
+
+4. **P2 — Precedence tests need boundary cases.** [The test matrix](/workspace/projects/careeros/lai-51/docs/plans/61-profile-loader-all-rows.md:94) should cover each field independently: primary `[]`/`{}` must win, while `null`/missing values fall back past newer null rows. Also test formal-only profiles: “no rows → all-null dimensions” is true only without completed assessments. Assert both service-role queries filter by the requested user.
+
+5. **P3 — Reduce unrelated scope and reconcile guarantees.** [Malformed-data normalization](/workspace/projects/careeros/lai-51/docs/plans/61-profile-loader-all-rows.md:69) conflicts with leaving single-row data untouched; specify the exception. The simpler implementation preserves base-row metadata and merges only required fields rather than defining historical precedence for unused keys. Drop the planned `CLAUDE.md` edit unless separately approved, as AGENTS.md requires.
+
+The duplicate-skill winner is explicitly documented, but it can reduce a CV-confirmed skill’s matching strength. That is an additional behavior change beyond unioning IDs; preserving the existing winner would reduce scope.
