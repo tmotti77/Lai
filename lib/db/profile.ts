@@ -8,6 +8,11 @@ import { mergeProfileRows, type ProfileRow } from "@/lib/matching/profile-rows";
 // every unbounded select regardless of whether .limit() is called.
 const PROFILE_PAGE_SIZE = 1000;
 
+// Sanity cap: no real user should have 10k+ career_profile rows. Guards
+// against an infinite loop if pagination ever misbehaves (e.g. a bad range
+// or a server that never reports a short final page).
+const PROFILE_PAGE_CAP = 10;
+
 export async function updateConversationStage(
   conversationId: string,
   stage: Stage,
@@ -60,6 +65,9 @@ export async function loadMergedProfile(userId: string) {
   const [latestConversationId, rows, formal] = await Promise.all([
     loadLatestConversationId(svc, userId),
     loadAllProfileRows(svc, userId),
+    // Silent swallow mirrors the previous (single-row) loader's behavior:
+    // a formal-assessment read failure degrades to formal: null rather than
+    // failing the whole profile load.
     getLatestByType(userId).catch(() => null),
   ]);
 
@@ -88,7 +96,13 @@ async function loadAllProfileRows(
 ): Promise<ProfileRow[]> {
   const rows: ProfileRow[] = [];
   let offset = 0;
-  for (;;) {
+  for (let page = 0; ; page++) {
+    if (page >= PROFILE_PAGE_CAP) {
+      throw new Error(
+        `loadMergedProfile: exceeded PROFILE_PAGE_CAP (${PROFILE_PAGE_CAP}) pages ` +
+          `for user ${userId}; refusing to keep paginating`,
+      );
+    }
     const { data, error } = await svc
       .from("career_profile")
       .select("*")
@@ -96,9 +110,9 @@ async function loadAllProfileRows(
       .order("id", { ascending: true })
       .range(offset, offset + PROFILE_PAGE_SIZE - 1);
     if (error) throw new Error(`loadMergedProfile: ${error.message}`);
-    const page = data ?? [];
-    rows.push(...(page as unknown as ProfileRow[]));
-    if (page.length < PROFILE_PAGE_SIZE) break;
+    const rowsPage = data ?? [];
+    rows.push(...(rowsPage as unknown as ProfileRow[]));
+    if (rowsPage.length < PROFILE_PAGE_SIZE) break;
     offset += PROFILE_PAGE_SIZE;
   }
   return rows;

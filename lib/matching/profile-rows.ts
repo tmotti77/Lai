@@ -16,6 +16,14 @@
  *      Skills with an `id` keep only the first (newest) occurrence of that
  *      id; skills without an `id` (chat extraction) are never deduped.
  *      Empty union -> `skills: undefined`.
+ *      NOTE (intentional, not a bug): this union is across ALL rows, not just
+ *      the primary row. If a skill is removed on a later CV confirm (it only
+ *      lives in the primary row's `skills` array, having been dropped there),
+ *      but an older orphan row still lists that skill by `id`, the union
+ *      resurrects it. We accept this tradeoff in favor of never losing a
+ *      skill a user once confirmed; see the pinned test
+ *      "resurrects a skill removed on a later CV confirm if an older orphan
+ *      row still has it" in tests/unit/matching/profile-rows.test.ts.
  *    - every other `data` key, and all row-level metadata: taken as-is from
  *      the primary row if one exists, else the newest row.
  *  - Malformed `data` (non-object) or `skills` (non-array) on any row inside

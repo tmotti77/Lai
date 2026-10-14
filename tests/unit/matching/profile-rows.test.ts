@@ -189,6 +189,64 @@ describe("mergeProfileRows", () => {
     expect(mergedNoMatchingPrimary?.data?.interests).toEqual(["new"]);
   });
 
+  it("resurrects a skill removed on a later CV confirm if an older orphan row still has it (intentional tradeoff, see profile-rows.ts)", () => {
+    const primaryAfterRemoval = row({
+      id: "primary",
+      conversation_id: "conv-1",
+      updated_at: "2026-01-02T00:00:00.000Z",
+      data: {
+        // User re-confirmed their CV and removed "python" from this row.
+        skills: [{ id: "javascript", name_he: "JavaScript", source: "cv" }],
+      },
+    });
+    const olderOrphanStillHasRemovedSkill = row({
+      id: "orphan",
+      conversation_id: null,
+      updated_at: "2026-01-01T00:00:00.000Z",
+      data: {
+        skills: [{ id: "python", name_he: "Python", source: "cv" }],
+      },
+    });
+
+    const merged = mergeProfileRows(
+      [primaryAfterRemoval, olderOrphanStillHasRemovedSkill],
+      "conv-1",
+    );
+
+    // "python" was removed from the primary row but is unioned back in from
+    // the stale orphan — this is the documented, accepted tradeoff.
+    expect(merged?.data?.skills).toEqual(
+      expect.arrayContaining([
+        { id: "javascript", name_he: "JavaScript", source: "cv" },
+        { id: "python", name_he: "Python", source: "cv" },
+      ]),
+    );
+    expect(merged?.data?.skills).toHaveLength(2);
+  });
+
+  it("latest conversation has no linked profile row: base is the newest row by updated_at", () => {
+    const olderRow = row({
+      id: "older",
+      conversation_id: "conv-old",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      data: { interests: ["old-interests"], other_field: "from-older" },
+    });
+    const newestRow = row({
+      id: "newest",
+      conversation_id: "conv-also-not-latest",
+      updated_at: "2026-01-03T00:00:00.000Z",
+      data: { interests: ["newest-interests"], other_field: "from-newest" },
+    });
+
+    // "conv-latest" has no career_profile row at all (e.g. the user started
+    // a fresh conversation but hasn't produced any profile data in it yet).
+    const merged = mergeProfileRows([olderRow, newestRow], "conv-latest");
+
+    expect(merged?.data?.interests).toEqual(["newest-interests"]);
+    expect(merged?.data?.other_field).toBe("from-newest");
+    expect((merged as ProfileRow).id).toBe("newest");
+  });
+
   it("dedupes skills by id in favor of the newer row, and keeps all id-less chat skills", () => {
     const primary = row({
       id: "primary",

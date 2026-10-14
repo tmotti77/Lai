@@ -170,6 +170,21 @@ describe("loadMergedProfile: pagination", () => {
 
     await expect(loadMergedProfile("user-1")).rejects.toThrow();
   });
+
+  it("throws a clear error instead of looping forever past PROFILE_PAGE_CAP full pages", async () => {
+    const PROFILE_PAGE_CAP = 10;
+    // Every page comes back full-sized, so pagination would never stop on
+    // its own — this pins the cap as the thing that breaks the loop.
+    state.profilePages = Array.from({ length: PROFILE_PAGE_CAP + 1 }, (_, p) =>
+      ({
+        data: Array.from({ length: PAGE_SIZE }, (_, i) => row({ id: `r-${p}-${i}` })),
+        error: null,
+      }),
+    );
+
+    await expect(loadMergedProfile("user-1")).rejects.toThrow(/PROFILE_PAGE_CAP/);
+    expect(state.profileCalls.length).toBe(PROFILE_PAGE_CAP);
+  });
 });
 
 describe("loadMergedProfile: merge end to end", () => {
