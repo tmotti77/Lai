@@ -9,7 +9,11 @@ const ROOT = path.resolve(__dirname, "../../..");
 const HEBREW = /[֐-׿]/;
 
 const PAGES = ["app/(app)/settings/page.tsx", "app/(marketing)/privacy/page.tsx", "app/page.tsx"];
-const files = [...globSync("components/settings/**/*.{ts,tsx}", { cwd: ROOT }), ...PAGES].sort();
+const files = [
+  ...globSync("components/settings/**/*.{ts,tsx}", { cwd: ROOT }),
+  ...globSync("components/cookie-consent/**/*.{ts,tsx}", { cwd: ROOT }),
+  ...PAGES,
+].sort();
 
 describe("no Hebrew literals outside lib/i18n", () => {
   it("matches the files it is meant to guard", () => {
@@ -19,6 +23,7 @@ describe("no Hebrew literals outside lib/i18n", () => {
       "components/settings/DeleteAccountDialog.tsx",
       "components/settings/messages.ts",
       "components/settings/useDataExport.ts",
+      "components/cookie-consent/CookieBanner.tsx",
     ]) {
       expect(files).toContain(f);
     }

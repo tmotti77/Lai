@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Heebo } from "next/font/google";
 import { ConsentedAnalytics } from "@/components/cookie-consent/ConsentedAnalytics";
+import { CookieBanner } from "@/components/cookie-consent/CookieBanner";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
+        <CookieBanner />
         {children}
         <Toaster position="top-center" dir="rtl" />
         {/* Client trackers mount only through this wrapper (#63) — never import @vercel/analytics directly. */}
