@@ -46,6 +46,12 @@ export type EventPropsMap = {
   account_deleted: { is_anonymous: boolean; had_auth_user: boolean };
 };
 
+// #63 decision 4: the installed @vercel/analytics/server SDK forwards requestContext.url
+// (which can include query strings) regardless of which headers are passed, independent of
+// any app-code change — so this is a best-effort, cookieless aggregate, not a verified
+// no-browser-identifiers guarantee. Not gated on the cookie-consent banner choice (decision 1
+// deliberately avoids a server-readable consent cookie). Invariant any new track() call site
+// must preserve: never put sensitive data in that route's own URL/query string.
 export function track<E extends EventName>(event: E, props: EventPropsMap[E]): void {
   if (process.env.NODE_ENV === "test") return;
   after(() => {

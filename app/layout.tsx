@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Heebo } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import { ConsentedAnalytics } from "@/components/cookie-consent/ConsentedAnalytics";
+import { CookieBanner } from "@/components/cookie-consent/CookieBanner";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -20,10 +21,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
-      <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
-        {children}
+      <body className="flex h-dvh flex-col bg-background font-sans text-foreground antialiased">
+        <CookieBanner />
+        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
         <Toaster position="top-center" dir="rtl" />
-        <Analytics />
+        {/* Client trackers mount only through this wrapper (#63) — never import @vercel/analytics directly. */}
+        <ConsentedAnalytics />
       </body>
     </html>
   );

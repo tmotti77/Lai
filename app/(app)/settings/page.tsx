@@ -1,6 +1,7 @@
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
+import { CookiePreferences } from "@/components/settings/CookiePreferences";
 import { DataRightsPanel } from "@/components/settings/DataRightsPanel";
 import { he } from "@/lib/i18n/he";
 import {
@@ -73,6 +74,9 @@ export default async function SettingsPage() {
       )}
       {view.kind === "noData" && <p className="rounded-md border bg-muted/30 p-4 text-sm">{s.noData}</p>}
       {view.kind === "panel" && <DataRightsPanel isAnonymous={view.isAnonymous} />}
+
+      {/* Cookie choice doesn't depend on identity, data-rights enablement or sign-in. */}
+      <CookiePreferences />
 
       <p className="text-sm">
         <Link href="/privacy" className="text-muted-foreground underline underline-offset-4 hover:text-foreground">

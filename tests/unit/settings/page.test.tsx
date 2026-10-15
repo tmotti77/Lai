@@ -32,6 +32,9 @@ vi.mock("@/components/settings/DataRightsPanel", () => ({
     <div data-testid="panel" data-anonymous={String(isAnonymous)} />
   ),
 }));
+vi.mock("@/components/settings/CookiePreferences", () => ({
+  CookiePreferences: () => <div data-testid="cookie-preferences" />,
+}));
 
 const { default: SettingsPage } = await import("@/app/(app)/settings/page");
 const { SessionRejectedError, AuthUnavailableError } = await import("@/lib/privacy/identity");
@@ -54,6 +57,7 @@ describe("/settings page states", () => {
     expect(h.resolve).not.toHaveBeenCalled();
     expect(screen.queryByTestId("panel")).toBeNull();
     expect(screen.queryAllByRole("button")).toEqual([]);
+    expect(screen.getByTestId("cookie-preferences")).toBeInTheDocument();
   });
 
   it("rejected session: sign in again, never the anonymous panel", async () => {
@@ -62,6 +66,7 @@ describe("/settings page states", () => {
     expect(screen.getByText(s.sessionExpired)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: s.signInAgain })).toHaveAttribute("href", "/sign-in");
     expect(screen.queryByTestId("panel")).toBeNull();
+    expect(screen.getByTestId("cookie-preferences")).toBeInTheDocument();
   });
 
   it("auth unavailable: alert + Sentry", async () => {
@@ -96,6 +101,13 @@ describe("/settings page states", () => {
     h.resolve.mockResolvedValue({ authUser: anon ? null : { id: "a1" }, ids: ids(anon) });
     render(await SettingsPage());
     expect(screen.getByTestId("panel")).toHaveAttribute("data-anonymous", String(anon));
+  });
+
+  it("panel view: also renders cookie preferences", async () => {
+    h.resolve.mockResolvedValue({ authUser: null, ids: ids(true) });
+    render(await SettingsPage());
+    expect(screen.getByTestId("panel")).toBeInTheDocument();
+    expect(screen.getByTestId("cookie-preferences")).toBeInTheDocument();
   });
 
   it("has a title and links to the privacy page", async () => {
