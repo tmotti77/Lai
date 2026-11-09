@@ -39,6 +39,12 @@ const CONFIDENCE_WEIGHT: Record<string, number> = {
 const DEFAULT_WEIGHT = CONFIDENCE_WEIGHT.medium;
 
 // Shared multi-letter keywords, listed once and spread into each letter below.
+// Because weight splits evenly, each group lands 50/50 on its two letters:
+// programming → I + C, tech/engineering → I + R, medicine/psychology → I + S,
+// finance/investing → E + C.
+//
+// Most stems are plain text. A few carry a regex lookahead to exclude a
+// specific unrelated word; each of those has a comment and a test.
 const PROGRAMMING_EN = [
   "programm*", "coding", "code", "software", "cyber*", "app", "apps", "develop*",
   "information security",
@@ -66,7 +72,8 @@ const LEXICON: Record<Letter, { en: string[]; he: string[] }> = {
     he: [
       ...TECH_HE,
       "בנייה", "בניה", "בנאות", "מכונ", "מכני", "חשמל", "אלקטרוני", "תיקון", "תקן", "נגרות",
-      "טבע", "שטח", "חקלא", "גינון", "בעלי חיים", "חיות", "ספורט", "כושר", "בישול", "מטבח",
+      // "שטח" (field work) but not "שטחי" (superficial).
+      "טבע", "שטח(?!י)", "חקלא", "גינון", "בעלי חיים", "חיות", "ספורט", "כושר", "בישול", "מטבח",
       "קולינרי", "רכב", "נהיגה", "תעופה", "טיס", "חומרה", "קרבי", "ידיים", "מסגרות",
       "ריתוך", "אחזקה",
     ],
@@ -136,9 +143,11 @@ const LEXICON: Record<Letter, { en: string[]; he: string[] }> = {
     ],
     he: [
       ...PROGRAMMING_HE, ...FINANCE_HE,
+      // "סדר" (order) but not "סדרה"/"סדרות" (TV series).
       "לסדר", "מסודר", "סדר(?![הו])", "ארגון", "ארגן", "מנהלה", "אדמיניסטר",
       "הנהלת חשבונות", "חשבונאות", "רואה חשבון", "כספים", "לוגיסטיק", "תכנון", "תפעול",
-      "אקסל", "בנק", "ביטוח", "בקרה", "נהלים", "משרד",
+      // "משרדי"/"משרדית" (office work), not bare "משרד" ("משרד הביטחון" is an employer).
+      "אקסל", "בנק", "ביטוח", "בקרה", "נהלים", "משרדי",
     ],
   },
 };

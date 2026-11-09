@@ -46,7 +46,9 @@ export function buildMatchingProfile(raw: RawProfile): MatchingProfile {
 
   // Formal RIASEC wins. Otherwise derive a vector from chat-extracted interests
   // with the deterministic lexicon (#50); null when nothing matches, so the
-  // engine re-normalizes weights over the remaining dimensions.
+  // engine re-normalizes weights over the remaining dimensions. The derived
+  // vector is part of profile_hash, so a lexicon change recomputes cached
+  // recommendations for affected users.
   const formalRiasec = raw?.formal?.riasec?.scores;
   if (formalRiasec) {
     profile.interests = formalRiasec as RiasecVector;

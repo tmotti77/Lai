@@ -62,6 +62,58 @@ describe("riasecFromChatInterests", () => {
     }
   });
 
+  it("matches order (סדר) when it is not part of סדרה/סדרות", () => {
+    expect(riasecFromChatInterests([{ label_he: "סדר ומשמעת", confidence: "high" }])!.C).toBe(100);
+  });
+
+  it("does not read the Ministry of Defense as office work", () => {
+    expect(riasecFromChatInterests([{ label_he: "משרד הביטחון", confidence: "high" }])).toBeNull();
+    expect(riasecFromChatInterests([{ label_he: "עבודה משרדית", confidence: "high" }])!.C).toBe(100);
+  });
+
+  it("does not read superficial (שטחי) as field work (שטח)", () => {
+    expect(riasecFromChatInterests([{ label_he: "שטחי", confidence: "high" }])).toBeNull();
+    expect(riasecFromChatInterests([{ label_he: "עבודת שטח", confidence: "high" }])!.R).toBe(100);
+  });
+
+  it("keeps longer words from short stems on the intended letter", () => {
+    // Reviewer-flagged stems: the longer word lands on the same letter, so no wrong signal.
+    expect(riasecFromChatInterests([{ label_he: "רכבות", confidence: "high" }])!.R).toBe(100);
+    expect(riasecFromChatInterests([{ label_he: "מזון טבעי", confidence: "high" }])!.R).toBe(100);
+    expect(riasecFromChatInterests([{ label_he: "עסקאות", confidence: "high" }])!.E).toBe(100);
+    expect(riasecFromChatInterests([{ label_he: "מדען", confidence: "high" }])!.I).toBe(100);
+  });
+
+  it("allows up to two attached Hebrew prefix letters, not three", () => {
+    expect(riasecFromChatInterests([{ label_he: "ולמוזיקה", confidence: "high" }])!.A).toBe(100);
+    expect(riasecFromChatInterests([{ label_he: "ובלמוזיקה", confidence: "high" }])).toBeNull();
+  });
+
+  it("expands a trailing * to an English word prefix", () => {
+    expect(riasecFromChatInterests([{ label: "Photographer", confidence: "high" }])!.A).toBe(100);
+  });
+
+  it("matches English terms written inside label_he", () => {
+    expect(riasecFromChatInterests([{ label_he: "UX", confidence: "high" }])!.A).toBe(100);
+  });
+
+  it("treats an unrecognized confidence value as medium", () => {
+    const v = riasecFromChatInterests([
+      { label_he: "מוזיקה", confidence: "high" },
+      { label_he: "שיווק", confidence: "very" },
+    ]);
+    expect(v!.E).toBe(60);
+  });
+
+  it("counts a letter once when both labels of one interest match it", () => {
+    const v = riasecFromChatInterests([
+      { label: "Music", label_he: "מוזיקה", confidence: "high" },
+      { label_he: "שיווק", confidence: "high" },
+    ]);
+    expect(v!.A).toBe(100);
+    expect(v!.E).toBe(100);
+  });
+
   it("splits a multi-letter interest evenly between its letters", () => {
     // Programming is Investigative + Conventional in the lexicon.
     const v = riasecFromChatInterests([{ label: "Programming", label_he: "תכנות", confidence: "high" }]);
