@@ -1,5 +1,6 @@
 import "server-only";
 import type { MatchingProfile, RiasecVector, Big5Vector } from "./types";
+import { riasecFromChatInterests, type ChatInterest } from "./interestsFromChat";
 
 type RawSkill = {
   // Phase 2 chat-extraction shape
@@ -14,7 +15,7 @@ type RawSkill = {
 
 type RawProfile = {
   data?: {
-    interests?: { label_he: string; confidence?: string }[];
+    interests?: ChatInterest[];
     skills?: RawSkill[];
     values?: string[];
     constraints?: Record<string, unknown>;
@@ -43,9 +44,16 @@ export function buildMatchingProfile(raw: RawProfile): MatchingProfile {
     constraints: null,
   };
 
+  // Formal RIASEC wins. Otherwise derive a vector from chat-extracted interests
+  // with the deterministic lexicon (#50); null when nothing matches, so the
+  // engine re-normalizes weights over the remaining dimensions. The derived
+  // vector is part of profile_hash, so a lexicon change recomputes cached
+  // recommendations for affected users.
   const formalRiasec = raw?.formal?.riasec?.scores;
   if (formalRiasec) {
     profile.interests = formalRiasec as RiasecVector;
+  } else {
+    profile.interests = riasecFromChatInterests(raw?.data?.interests);
   }
 
   const formalBig5 = raw?.formal?.big5?.scores;
